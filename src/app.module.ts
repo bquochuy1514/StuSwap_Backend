@@ -13,6 +13,8 @@ import { join } from 'path';
 import { ProductsModule } from './modules/products/products.module';
 import { Product } from './modules/products/entities/product.entity';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { AddressesModule } from './modules/addresses/addresses.module';
+import { ProductAddressesModule } from './modules/product_addresses/product_addresses.module';
 
 @Module({
   imports: [
@@ -67,6 +69,8 @@ import { CategoriesModule } from './modules/categories/categories.module';
       rootPath: join(__dirname, '..', 'public'), // thư mục chứa ảnh
     }),
     CategoriesModule,
+    AddressesModule,
+    ProductAddressesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

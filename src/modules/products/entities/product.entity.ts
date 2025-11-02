@@ -6,10 +6,12 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
 } from 'typeorm';
 import { User } from 'src/modules/users/entities/user.entity';
 import { ProductCondition } from '../enums/product.enum';
 import { Category } from 'src/modules/categories/entities/category.entity';
+import { ProductAddress } from 'src/modules/product_addresses/entities/product_address.dto';
 
 @Entity('products')
 export class Product {
@@ -44,8 +46,11 @@ export class Product {
   @JoinColumn({ name: 'category_id' })
   category: Category;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  location: string;
+  // One-to-one with ProductAddress
+  @OneToOne(() => ProductAddress, (address) => address.product, {
+    cascade: true,
+  })
+  address: ProductAddress;
 
   @Column({ type: 'text', nullable: true })
   image_urls: string;

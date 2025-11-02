@@ -5,9 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
 import { UserRole } from '../enums/user.enum';
 import { Product } from 'src/modules/products/entities/product.entity';
+import { Address } from 'src/modules/addresses/entities/address.entity';
 
 @Entity('users')
 export class User {
@@ -39,8 +42,11 @@ export class User {
   @Column({ type: 'varchar', length: 100, nullable: true })
   university: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  address: string;
+  @OneToOne(() => Address, (address) => address.user, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
+  address: Address;
 
   // --- Account verification fields ---
   @Column({ name: 'code_id', type: 'varchar', nullable: true })

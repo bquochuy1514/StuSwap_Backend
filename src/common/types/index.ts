@@ -1,5 +1,4 @@
 import { Exclude } from 'class-transformer';
-import { ProductCondition } from 'src/modules/products/enums/product.enum';
 
 export class SerializedUser {
   id: number;

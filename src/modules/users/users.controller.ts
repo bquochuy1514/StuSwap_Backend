@@ -1,6 +1,5 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
@@ -20,6 +19,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { UpdateProfileDto } from './dto/update-user-profile.dto';
 import { UploadAvatar } from './interceptors/upload-avatar.interceptor';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('users')
 export class UsersController {
@@ -40,12 +40,23 @@ export class UsersController {
     @Body() updateProfileDto: UpdateProfileDto,
     @UploadedFile() avatarFile: Express.Multer.File,
   ) {
-    const updatedUser = await this.usersService.handleUpdateUserProfile(
+    return await this.usersService.handleUpdateUserProfile(
       req.user,
       updateProfileDto,
       avatarFile,
     );
-    return new SerializedUser(updatedUser);
+  }
+
+  @Put('/change-password')
+  @UseGuards(JwtAuthGuard)
+  async changeUserPassword(
+    @Req() req,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return await this.usersService.handleChangeUserPassword(
+      req.user,
+      changePasswordDto,
+    );
   }
 
   @Get('')

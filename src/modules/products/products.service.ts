@@ -16,6 +16,7 @@ import { SerializedUser } from 'src/common/types';
 import * as path from 'path';
 import * as fs from 'fs';
 import { CategoriesService } from '../categories/categories.service';
+import { ProductAddress } from '../product_addresses/entities/product_address.dto';
 
 @Injectable()
 export class ProductsService {
@@ -24,6 +25,8 @@ export class ProductsService {
     private productsRepository: Repository<Product>,
     private readonly usersService: UsersService,
     private readonly categoriesService: CategoriesService,
+    @InjectRepository(ProductAddress)
+    private productAddressRepository: Repository<ProductAddress>,
   ) {}
 
   async handleCreateProduct(
@@ -31,11 +34,11 @@ export class ProductsService {
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
   ) {
-    // trả user typeorm thông qua hàm handleGetUserProfile
+    // 1️⃣ Lấy user TypeORM entity
     const userDB = await this.usersService.handleGetUserProfile(user);
-    if (!userDB) throw new UnauthorizedException('User Not Found');
+    if (!userDB) throw new UnauthorizedException('Người dùng không tồn tại');
 
-    // Lấy category nếu có
+    // 2️⃣ Kiểm tra category
     let category = null;
     if (createProductDto.category_id) {
       category = await this.categoriesService.handleGetCategoryById(
@@ -46,33 +49,63 @@ export class ProductsService {
       }
     }
 
+    // 3️⃣ Xử lý hình ảnh
     const imageUrls: string[] =
       files?.map(
         (file) => `${process.env.APP_URL}/images/products/${file.filename}`,
       ) || [];
 
+    // 4️⃣ Tạo product trước (chưa gắn address)
     const product = this.productsRepository.create({
-      ...createProductDto,
-      image_urls: JSON.stringify(imageUrls),
-      user: userDB,
+      title: createProductDto.title,
+      description: createProductDto.description,
+      price: createProductDto.price,
+      condition: createProductDto.condition,
       category,
+      user: userDB,
+      image_urls: JSON.stringify(imageUrls),
+      is_sold: createProductDto.is_sold || false,
+      is_premium: createProductDto.is_premium || false,
     });
 
+    // 👉 Lưu product trước để có ID
     const savedProduct = await this.productsRepository.save(product);
 
+    // 5️⃣ Nếu có địa chỉ -> tạo ProductAddress riêng, gắn product sau khi có id
+    if (createProductDto.address) {
+      const { specificAddress, ward, district, province } =
+        createProductDto.address;
+
+      const address = this.productAddressRepository.create({
+        specificAddress,
+        ward,
+        district,
+        province,
+        product: savedProduct, // giờ product đã có id thật
+      });
+
+      await this.productAddressRepository.save(address);
+    }
+
+    // 6️⃣ Lấy lại sản phẩm có quan hệ đầy đủ
+    const fullProduct = await this.productsRepository.findOne({
+      where: { id: savedProduct.id },
+      relations: ['user', 'category', 'address'],
+    });
+
+    // 7️⃣ Trả response
     return {
       message: 'Tạo sản phẩm thành công',
       product: {
-        ...savedProduct,
+        ...fullProduct,
         user: new SerializedUser(userDB),
-        category,
       },
     };
   }
 
   async handleFindAllProducts() {
     const products = await this.productsRepository.find({
-      relations: ['user', 'category'],
+      relations: ['user', 'category', 'address'],
       order: { created_at: 'DESC' },
     });
 

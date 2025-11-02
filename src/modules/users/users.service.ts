@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -8,6 +12,12 @@ import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { UpdateProfileDto } from './dto/update-user-profile.dto';
 import { join } from 'path';
 import { unlink } from 'fs/promises';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import {
+  comparePassword,
+  hashPassword,
+} from 'src/common/utils/password-hash.util';
+import { Address } from '../addresses/entities/address.entity';
 
 @Injectable()
 export class UsersService {
@@ -15,6 +25,8 @@ export class UsersService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private readonly configService: ConfigService,
+    @InjectRepository(Address)
+    private addressesRepository: Repository<Address>,
   ) {}
 
   private formatAvatarUrl(avatarPath: string): string {
@@ -29,7 +41,10 @@ export class UsersService {
   }
 
   async findUserByEmail(email: string) {
-    return await this.usersRepository.findOne({ where: { email } });
+    return await this.usersRepository.findOne({
+      where: { email },
+      relations: ['address'],
+    });
   }
 
   async handleGetUserProfile(payload: any) {
@@ -53,23 +68,14 @@ export class UsersService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
 
-    // 2. Update các field được phép
-    if (updateProfileDto.fullName !== undefined) {
-      userDB.fullName = updateProfileDto.fullName;
-    }
-
-    if (updateProfileDto.phone !== undefined) {
-      userDB.phone = updateProfileDto.phone;
-    }
-
-    // Cập nhật avatar nếu có file
+    // 2. Cập nhật avatar nếu có
     if (avatarFile) {
       const oldAvatar = userDB.avatar; // lưu tên ảnh cũ
 
       // Update avatar mới
-      userDB.avatar = `/images/users/${avatarFile.filename}`;
+      updateProfileDto.avatar = `/images/users/${avatarFile.filename}`;
 
-      // 4. Xóa avatar cũ nếu không phải default
+      // Xóa avatar cũ nếu không phải default
       const defaultAvatars = ['default_avatar.jpg', 'admin.jpg'];
       if (
         oldAvatar &&
@@ -85,8 +91,79 @@ export class UsersService {
       }
     }
 
-    // 3. Lưu thay đổi
-    return await this.usersRepository.save(userDB);
+    // 3. Chuẩn hóa phone
+    if (updateProfileDto.phone === undefined) {
+      updateProfileDto.phone = null;
+    }
+
+    // 4. Xử lý address (tạo mới nếu chưa có)
+    if (updateProfileDto.address) {
+      const { specificAddress, ward, district, province } =
+        updateProfileDto.address;
+
+      if (userDB.address) {
+        // Đã có address -> update
+        await this.addressesRepository.update(userDB.address.id, {
+          specificAddress,
+          ward,
+          district,
+          province,
+        });
+      } else {
+        // Chưa có address -> tạo mới
+        const newAddress = this.addressesRepository.create({
+          specificAddress,
+          ward,
+          district,
+          province,
+          user: userDB,
+        });
+        await this.addressesRepository.save(newAddress);
+      }
+    }
+
+    // 5. Update các field khác của user
+    delete updateProfileDto.address; // Xoá để tránh lỗi vì ta đã xử lý riêng cập nhật user address ở trên
+    await this.usersRepository.update(userDB.id, {
+      ...updateProfileDto,
+    });
+
+    // 5. Lưu thay đổi
+    return new SerializedUser(
+      await this.usersRepository.findOne({
+        where: { id: userDB.id },
+        relations: ['address'],
+      }),
+    );
+  }
+
+  async handleChangeUserPassword(
+    user: any,
+    changePasswordDto: ChangePasswordDto,
+  ) {
+    const userDB = await this.findUserByEmail(user.email);
+    if (!userDB) throw new NotFoundException('Không tồn tại người dùng');
+
+    const isMatchedPassword = await comparePassword(
+      changePasswordDto.currentPassword,
+      userDB.password,
+    );
+
+    if (!isMatchedPassword)
+      throw new BadRequestException('Mật khẩu hiện tại không chính xác!');
+
+    const newPassword = await hashPassword(changePasswordDto.newPassword);
+
+    userDB.password = newPassword;
+
+    await this.usersRepository.update(
+      { id: userDB.id },
+      { password: newPassword },
+    );
+
+    return {
+      message: 'Cập nhật mật khẩu thành công!',
+    };
   }
 
   async handleGetAllUsers() {
