@@ -91,11 +91,6 @@ export class UsersService {
       }
     }
 
-    // 3. Chuẩn hóa phone
-    if (updateProfileDto.phone === undefined) {
-      updateProfileDto.phone = null;
-    }
-
     // 4. Xử lý address (tạo mới nếu chưa có)
     if (updateProfileDto.address) {
       const { specificAddress, ward, district, province } =

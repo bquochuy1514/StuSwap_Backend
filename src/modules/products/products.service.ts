@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -16,7 +17,8 @@ import { SerializedUser } from 'src/common/types';
 import * as path from 'path';
 import * as fs from 'fs';
 import { CategoriesService } from '../categories/categories.service';
-import { ProductAddress } from '../product_addresses/entities/product_address.dto';
+import { ProductAddress } from '../product_addresses/entities/product_address.entity';
+import { ProductStatus, PromotionType } from './enums/product.enum';
 
 @Injectable()
 export class ProductsService {
@@ -34,11 +36,11 @@ export class ProductsService {
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
   ) {
-    // 1️⃣ Lấy user TypeORM entity
+    // 1 Lấy user TypeORM entity
     const userDB = await this.usersService.handleGetUserProfile(user);
     if (!userDB) throw new UnauthorizedException('Người dùng không tồn tại');
 
-    // 2️⃣ Kiểm tra category
+    // 2 Kiểm tra category
     let category = null;
     if (createProductDto.category_id) {
       category = await this.categoriesService.handleGetCategoryById(
@@ -49,13 +51,19 @@ export class ProductsService {
       }
     }
 
-    // 3️⃣ Xử lý hình ảnh
+    // 3 Xử lý hình ảnh
     const imageUrls: string[] =
       files?.map(
         (file) => `${process.env.APP_URL}/images/products/${file.filename}`,
       ) || [];
 
-    // 4️⃣ Tạo product trước (chưa gắn address)
+    const DISPLAY_DAYS = 60;
+    const now = new Date();
+    const expireAt = new Date(
+      now.getTime() + DISPLAY_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    // 4 Tạo product trước
     const product = this.productsRepository.create({
       title: createProductDto.title,
       description: createProductDto.description,
@@ -64,14 +72,15 @@ export class ProductsService {
       category,
       user: userDB,
       image_urls: JSON.stringify(imageUrls),
-      is_sold: createProductDto.is_sold || false,
-      is_premium: createProductDto.is_premium || false,
+      expire_at: expireAt, // tin sẽ hết hạn sau 60 ngày
+      promotion_type: PromotionType.NONE, // chưa chọn gói nào
+      promotion_expire_at: null,
     });
 
-    // 👉 Lưu product trước để có ID
+    // Lưu product trước để có ID
     const savedProduct = await this.productsRepository.save(product);
 
-    // 5️⃣ Nếu có địa chỉ -> tạo ProductAddress riêng, gắn product sau khi có id
+    // 5 Nếu có địa chỉ -> tạo ProductAddress riêng, gắn product sau khi có id
     if (createProductDto.address) {
       const { specificAddress, ward, district, province } =
         createProductDto.address;
@@ -87,15 +96,15 @@ export class ProductsService {
       await this.productAddressRepository.save(address);
     }
 
-    // 6️⃣ Lấy lại sản phẩm có quan hệ đầy đủ
+    // 6 Lấy lại sản phẩm có quan hệ đầy đủ
     const fullProduct = await this.productsRepository.findOne({
       where: { id: savedProduct.id },
       relations: ['user', 'category', 'address'],
     });
 
-    // 7️⃣ Trả response
+    // 7 Trả response
     return {
-      message: 'Tạo sản phẩm thành công',
+      message: 'Đăng tin thành công!',
       product: {
         ...fullProduct,
         user: new SerializedUser(userDB),
@@ -103,7 +112,65 @@ export class ProductsService {
     };
   }
 
+  async simulatePaymentSuccess(
+    user: any,
+    productId: number,
+    promotionType: PromotionType,
+  ) {
+    const product = await this.productsRepository.findOne({
+      where: { id: productId },
+      relations: ['user'],
+    });
+
+    if (!product) throw new NotFoundException('Không tìm thấy sản phẩm');
+    if (product.user.id !== user.id)
+      throw new ForbiddenException('Không có quyền');
+
+    // Giả lập như thanh toán thành công
+    const now = new Date();
+    const days =
+      promotionType === PromotionType.BOOST
+        ? 7
+        : promotionType === PromotionType.PRIORITY
+          ? 30
+          : 0;
+
+    product.promotion_type = promotionType;
+    product.promotion_expire_at = new Date(
+      now.getTime() + days * 24 * 60 * 60 * 1000,
+    );
+
+    await this.productsRepository.save(product);
+
+    return {
+      message: `Thanh toán thành công — gói ${promotionType} đã được kích hoạt`,
+      product,
+    };
+  }
+
   async handleFindAllProducts() {
+    const products = await this.productsRepository.find({
+      where: { status: ProductStatus.APPROVED },
+      relations: ['user', 'category', 'address'],
+      order: { created_at: 'DESC' },
+    });
+
+    // map user sang SerializedUser
+    return products.map((product) => ({
+      ...product,
+      user: new SerializedUser(product.user),
+    }));
+  }
+
+  async handleGetMyProducts(user: any) {
+    return await this.productsRepository.find({
+      where: { user: { id: user.id } },
+      order: { created_at: 'DESC' },
+      relations: ['category', 'address'],
+    });
+  }
+
+  async handleFindAllForAdmin() {
     const products = await this.productsRepository.find({
       relations: ['user', 'category', 'address'],
       order: { created_at: 'DESC' },
@@ -119,7 +186,7 @@ export class ProductsService {
   async handleGetProductById(id: number) {
     const productDB = await this.productsRepository.findOne({
       where: { id },
-      relations: ['user', 'category'],
+      relations: ['user', 'category', 'address'],
     });
 
     if (!productDB) {

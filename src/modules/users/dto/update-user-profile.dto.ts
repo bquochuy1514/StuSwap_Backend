@@ -15,7 +15,7 @@ export class UpdateProfileDto {
   fullName?: string;
 
   @IsOptional()
-  @Transform(({ value }) => (value === '' ? undefined : value))
+  @Transform(({ value }) => (value === '' ? null : value))
   @IsPhoneNumber('VN', { message: 'Số điện thoại phải là số Việt Nam hợp lệ' })
   phone?: string;
 

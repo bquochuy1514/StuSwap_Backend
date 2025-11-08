@@ -10,13 +10,13 @@ import {
   UseInterceptors,
   UploadedFiles,
   Put,
-  UseFilters,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadProductImages } from './interceptors/upload-product-images.interceptor';
+import { PromotionType } from './enums/product.enum';
 
 @Controller('products')
 export class ProductsController {
@@ -37,9 +37,29 @@ export class ProductsController {
     );
   }
 
+  @Put(':id/simulate-payment')
+  @UseGuards(JwtAuthGuard)
+  simulatePayment(
+    @Req() req,
+    @Param('id') id: number,
+    @Body() body: { promotion_type: PromotionType },
+  ) {
+    return this.productsService.simulatePaymentSuccess(
+      req.user,
+      id,
+      body.promotion_type,
+    );
+  }
+
   @Get()
   findAll() {
     return this.productsService.handleFindAllProducts();
+  }
+
+  @Get('my')
+  @UseGuards(JwtAuthGuard)
+  getMyProducts(@Req() req) {
+    return this.productsService.handleGetMyProducts(req.user);
   }
 
   @Get(':id')

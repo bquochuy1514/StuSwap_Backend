@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ProductAddressesService } from './product_addresses.service';
 import { ProductAddressesController } from './product_addresses.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ProductAddress } from './entities/product_address.dto';
+import { ProductAddress } from './entities/product_address.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ProductAddress])],

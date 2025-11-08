@@ -157,7 +157,7 @@ export class AuthService {
   }
 
   async generateTokens(user: any) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { id: user.id, email: user.email, role: user.role };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload),
       this.jwtService.signAsync(payload, this.refreshTokenConfig),
@@ -170,7 +170,6 @@ export class AuthService {
   }
 
   async handleRefreshToken(user: any) {
-    user.id = user.sub;
     const { accessToken, refreshToken } = await this.generateTokens(user);
 
     const hashedRefreshToken = await argon2.hash(refreshToken);

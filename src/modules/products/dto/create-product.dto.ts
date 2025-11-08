@@ -7,7 +7,6 @@ import {
   IsEnum,
   IsBoolean,
   Min,
-  MinLength,
   IsObject,
 } from 'class-validator';
 import { ProductCondition } from '../enums/product.enum';
@@ -24,7 +23,7 @@ export class CreateProductDto {
   description: string;
 
   @IsNumber({}, { message: 'Giá sản phẩm phải là số' })
-  @Min(0, { message: 'Giá sản phẩm không được âm' })
+  @Min(10000, { message: 'Giá sản phẩm tối thiểu 10.000đ' })
   @IsNotEmpty({ message: 'Giá sản phẩm không được để trống' })
   price: number;
 
@@ -36,7 +35,7 @@ export class CreateProductDto {
   @IsNotEmpty({ message: 'Danh mục không được để trống' })
   category_id: number;
 
-  // --- Thông tin địa chỉ sản phẩm (giống style UpdateProfileDto) ---
+  // --- Địa chỉ sản phẩm ---
   @IsOptional()
   @IsObject({ message: 'Địa chỉ sản phẩm phải là một object' })
   address?: {
@@ -46,9 +45,6 @@ export class CreateProductDto {
     province?: string;
   };
 
-  @IsOptional()
-  @Transform(({ value }) => (value === '' ? undefined : value))
-  @IsString({ message: 'URL hình ảnh phải là chuỗi' })
   image_urls?: string;
 
   @IsOptional()

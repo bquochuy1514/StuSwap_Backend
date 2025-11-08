@@ -4,17 +4,16 @@ import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './modules/users/users.module';
-import { User } from './modules/users/entities/user.entity';
 import { AuthModule } from './modules/auth/auth.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { ProductsModule } from './modules/products/products.module';
-import { Product } from './modules/products/entities/product.entity';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { ProductAddressesModule } from './modules/product_addresses/product_addresses.module';
+import { VnpayModule } from './modules/payments/vnpay/vnpay.module';
 
 @Module({
   imports: [
@@ -71,6 +70,7 @@ import { ProductAddressesModule } from './modules/product_addresses/product_addr
     CategoriesModule,
     AddressesModule,
     ProductAddressesModule,
+    VnpayModule,
   ],
   controllers: [AppController],
   providers: [AppService],

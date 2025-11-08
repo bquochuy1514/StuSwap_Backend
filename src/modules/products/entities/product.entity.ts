@@ -9,9 +9,13 @@ import {
   OneToOne,
 } from 'typeorm';
 import { User } from 'src/modules/users/entities/user.entity';
-import { ProductCondition } from '../enums/product.enum';
+import {
+  ProductCondition,
+  ProductStatus,
+  PromotionType,
+} from '../enums/product.enum';
 import { Category } from 'src/modules/categories/entities/category.entity';
-import { ProductAddress } from 'src/modules/product_addresses/entities/product_address.dto';
+import { ProductAddress } from 'src/modules/product_addresses/entities/product_address.entity';
 
 @Entity('products')
 export class Product {
@@ -29,7 +33,7 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 15, scale: 2 })
   price: number;
 
   @Column({
@@ -60,6 +64,35 @@ export class Product {
 
   @Column({ type: 'boolean', default: false })
   is_premium: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  payment_required: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: ProductStatus,
+    default: ProductStatus.PENDING,
+  })
+  status: ProductStatus;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  reject_reason: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expire_at: Date | null;
+
+  @Column({
+    type: 'enum',
+    enum: PromotionType,
+    default: PromotionType.NONE,
+  })
+  promotion_type: PromotionType;
+
+  @Column({ type: 'timestamp', nullable: true })
+  promotion_expire_at: Date | null;
 
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;

@@ -1,4 +1,3 @@
-import { Exclude } from 'class-transformer';
 import { Product } from 'src/modules/products/entities/product.entity';
 import {
   Entity,

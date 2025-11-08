@@ -7,7 +7,7 @@ import { JwtStrategy } from '../auth/strategies/jwt.strategy';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { CategoriesModule } from '../categories/categories.module';
-import { ProductAddress } from '../product_addresses/entities/product_address.dto';
+import { ProductAddress } from '../product_addresses/entities/product_address.entity';
 
 @Module({
   imports: [

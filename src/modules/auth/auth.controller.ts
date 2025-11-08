@@ -94,6 +94,11 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   async googleCallback(@Req() req, @Res() res) {
+    if (!req.user) {
+      // Không cần redirect nữa vì Guard đã redirect rồi
+      return;
+    }
+
     const response = await this.authService.loginWithGoogle(req.user);
     const { access_token, refresh_token } = response;
 
@@ -105,6 +110,6 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
     });
 
-    res.redirect(`http://localhost:3000?access_token=${access_token}`);
+    res.redirect(`${process.env.FRONTEND_URL}?access_token=${access_token}`);
   }
 }

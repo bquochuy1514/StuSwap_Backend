@@ -26,8 +26,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
     profile: any,
     done: VerifyCallback,
   ) {
-    console.log({ profile });
-    // Cái đống thông tin được truyền ở dưới là từ profile của Google trả về
+    const email = profile.emails[0].value;
+    const domain = email.split('@')[1];
+
+    const isEduEmail = domain.endsWith('.edu') || domain.endsWith('.edu.vn');
+
+    if (!isEduEmail) {
+      return done(null, false, {
+        message: 'Email phải có đuôi .edu hoặc .edu.vn',
+      });
+    }
+
     const user = await this.authService.validateGoogleUser({
       email: profile.emails[0].value,
       firstName: profile.name.givenName,
