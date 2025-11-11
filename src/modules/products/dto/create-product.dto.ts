@@ -36,8 +36,8 @@ export class CreateProductDto {
   category_id: number;
 
   // --- Địa chỉ sản phẩm ---
-  @IsOptional()
   @IsObject({ message: 'Địa chỉ sản phẩm phải là một object' })
+  @IsNotEmpty({ message: 'Vị trí sản phẩm không được để trống' })
   address?: {
     specificAddress?: string;
     ward?: string;

@@ -16,7 +16,6 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadProductImages } from './interceptors/upload-product-images.interceptor';
-import { PromotionType } from './enums/product.enum';
 
 @Controller('products')
 export class ProductsController {
@@ -34,20 +33,6 @@ export class ProductsController {
       req.user,
       createProductDto,
       files,
-    );
-  }
-
-  @Put(':id/simulate-payment')
-  @UseGuards(JwtAuthGuard)
-  simulatePayment(
-    @Req() req,
-    @Param('id') id: number,
-    @Body() body: { promotion_type: PromotionType },
-  ) {
-    return this.productsService.simulatePaymentSuccess(
-      req.user,
-      id,
-      body.promotion_type,
     );
   }
 
@@ -84,9 +69,15 @@ export class ProductsController {
     );
   }
 
-  @Delete(':id')
+  @Post(':id/hide')
   @UseGuards(JwtAuthGuard)
   deleteProductById(@Param('id') id: number, @Req() req) {
-    return this.productsService.handleDeleteProductById(id, req.user);
+    return this.productsService.hideProduct(id, req.user);
+  }
+
+  @Post(':id/unhide')
+  @UseGuards(JwtAuthGuard)
+  restoreProductById(@Param('id') id: number, @Req() req) {
+    return this.productsService.unhideProduct(id, req.user);
   }
 }

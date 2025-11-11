@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Req,
   UnauthorizedException,
@@ -10,7 +11,7 @@ import {
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
-import { Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UsersService } from '../users/users.service';
 import { SerializedUser } from 'src/common/types';
@@ -19,9 +20,12 @@ import * as fs from 'fs';
 import { CategoriesService } from '../categories/categories.service';
 import { ProductAddress } from '../product_addresses/entities/product_address.entity';
 import { ProductStatus, PromotionType } from './enums/product.enum';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
+
   constructor(
     @InjectRepository(Product)
     private productsRepository: Repository<Product>,
@@ -30,6 +34,19 @@ export class ProductsService {
     @InjectRepository(ProductAddress)
     private productAddressRepository: Repository<ProductAddress>,
   ) {}
+
+  async handleGetOriginProduct(id: number) {
+    const productDB = await this.productsRepository.findOne({
+      where: { id },
+      relations: ['address'],
+    });
+
+    if (!productDB) {
+      throw new NotFoundException('Không tìm thấy sản phẩm');
+    }
+
+    return productDB;
+  }
 
   async handleCreateProduct(
     user: any,
@@ -112,42 +129,6 @@ export class ProductsService {
     };
   }
 
-  async simulatePaymentSuccess(
-    user: any,
-    productId: number,
-    promotionType: PromotionType,
-  ) {
-    const product = await this.productsRepository.findOne({
-      where: { id: productId },
-      relations: ['user'],
-    });
-
-    if (!product) throw new NotFoundException('Không tìm thấy sản phẩm');
-    if (product.user.id !== user.id)
-      throw new ForbiddenException('Không có quyền');
-
-    // Giả lập như thanh toán thành công
-    const now = new Date();
-    const days =
-      promotionType === PromotionType.BOOST
-        ? 7
-        : promotionType === PromotionType.PRIORITY
-          ? 30
-          : 0;
-
-    product.promotion_type = promotionType;
-    product.promotion_expire_at = new Date(
-      now.getTime() + days * 24 * 60 * 60 * 1000,
-    );
-
-    await this.productsRepository.save(product);
-
-    return {
-      message: `Thanh toán thành công — gói ${promotionType} đã được kích hoạt`,
-      product,
-    };
-  }
-
   async handleFindAllProducts() {
     const products = await this.productsRepository.find({
       where: { status: ProductStatus.APPROVED },
@@ -163,11 +144,18 @@ export class ProductsService {
   }
 
   async handleGetMyProducts(user: any) {
-    return await this.productsRepository.find({
+    const products = await this.productsRepository.find({
       where: { user: { id: user.id } },
-      order: { created_at: 'DESC' },
+      order: {
+        // Sắp xếp: chưa hết hạn lên trước, sau đó theo ngày tạo
+        is_expired: 'ASC',
+        created_at: 'DESC',
+      },
       relations: ['category', 'address'],
+      withDeleted: true, // Lấy cả tin đã ẩn
     });
+
+    return products;
   }
 
   async handleFindAllForAdmin() {
@@ -276,42 +264,152 @@ export class ProductsService {
     };
   }
 
-  async handleDeleteProductById(id: number, user: any) {
-    const userDB = await this.usersService.findUserByEmail(user.email);
-    const productDB = await this.productsRepository.findOne({
-      where: { id },
-      relations: ['user'],
+  async hideProduct(productId: number, user: any) {
+    const userId = user.id;
+    const product = await this.productsRepository.findOne({
+      where: { id: productId, user: { id: userId } },
     });
 
-    if (!productDB) {
-      throw new NotFoundException('Không tìm thấy sản phẩm');
+    if (!product) {
+      throw new Error('Không tìm thấy sản phẩm');
     }
 
-    if (userDB.id !== productDB.user.id && userDB.role !== 'admin') {
-      throw new ForbiddenException('Bạn không có quyền xoá sản phẩm này');
+    // Soft delete - set deleted_at
+    await this.productsRepository.softRemove(product);
+
+    return { message: 'Đã ẩn sản phẩm thành công' };
+  }
+
+  async unhideProduct(productId: number, user: any) {
+    const userId = user.id;
+
+    // Tìm sản phẩm bao gồm cả soft-deleted
+    const product = await this.productsRepository.findOne({
+      where: { id: productId, user: { id: userId } },
+      withDeleted: true, // 👈 để có thể tìm thấy sản phẩm đã bị soft delete
+    });
+
+    if (!product) {
+      throw new Error(
+        'Không tìm thấy sản phẩm hoặc bạn không có quyền truy cập',
+      );
     }
 
-    const currentImagesUrls: string[] = JSON.parse(
-      productDB.image_urls || '[]',
-    );
+    if (!product.deleted_at) {
+      return { message: 'Sản phẩm này đang hiển thị rồi' };
+    }
 
-    // Xóa ảnh khỏi file system
-    await Promise.all(
-      currentImagesUrls.map((url) => {
-        const filePath = path.join(
-          __dirname,
-          '../../../public/images/products',
-          path.basename(url),
-        );
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      }),
-    );
+    // Restore lại tin (bỏ deleted_at)
+    await this.productsRepository.restore(productId);
 
-    // Delete dữ liệu
-    await this.productsRepository.delete(id);
+    return { message: 'Đã hiển thị lại sản phẩm thành công' };
+  }
+
+  async markAsPromotion(productId: number, packageType: PromotionType) {
+    const product = await this.productsRepository.findOne({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Không tìm thấy sản phẩm để cập nhật.');
+    }
+
+    let promotionDays = 0;
+    let isPremium = false;
+    let priorityLevel = 0;
+
+    switch (packageType) {
+      case PromotionType.BOOST:
+        promotionDays = 7; // hiển thị đầu danh sách trong 7 ngày
+        isPremium = false;
+        priorityLevel = 1;
+        break;
+
+      case PromotionType.PRIORITY:
+        promotionDays = 30; // hoặc 15 nếu muốn
+        isPremium = true;
+        priorityLevel = 2;
+        break;
+
+      default:
+        promotionDays = 0;
+        isPremium = false;
+        priorityLevel = 0;
+        break;
+    }
+
+    const expireAt = new Date();
+    expireAt.setDate(expireAt.getDate() + promotionDays);
+
+    product.promotion_type = packageType;
+    product.promotion_expire_at = expireAt;
+    product.is_premium = isPremium;
+    product.priority_level = priorityLevel;
+
+    await this.productsRepository.save(product);
 
     return {
-      message: 'Xoá sản phẩm thành công',
+      message: `Đã cập nhật sản phẩm #${product.id} thành gói ${packageType}`,
+      product,
     };
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async handleExpiredPromotions() {
+    const now = new Date();
+
+    // Lấy các tin đã hết hạn promotion
+    const expiredProducts = await this.productsRepository.find({
+      where: {
+        promotion_expire_at: LessThan(now),
+        promotion_type: Not(PromotionType.NONE),
+      },
+    });
+
+    if (expiredProducts.length === 0) {
+      this.logger.log('✅ Không có sản phẩm nào hết hạn tin đẩy.');
+      return;
+    }
+
+    // Reset về trạng thái thường
+    for (const product of expiredProducts) {
+      product.promotion_type = PromotionType.NONE;
+      product.is_premium = false;
+      product.promotion_expire_at = null;
+      product.priority_level = 0;
+      await this.productsRepository.save(product);
+    }
+
+    this.logger.log(
+      `⏳ Đã reset ${expiredProducts.length} sản phẩm hết hạn khuyến mãi.`,
+    );
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async handleExpiredProducts() {
+    const now = new Date();
+
+    const expiredProducts = await this.productsRepository.find({
+      where: {
+        expire_at: LessThan(now),
+        is_expired: false, // Chưa được đánh dấu
+        deleted_at: IsNull(), // Chưa bị ẩn thủ công
+      },
+    });
+
+    if (expiredProducts.length === 0) {
+      this.logger.log('✅ Không có sản phẩm nào hết hạn hiển thị.');
+      return;
+    }
+
+    // CHỈ cập nhật cờ is_expired, KHÔNG soft delete
+    await this.productsRepository.update(
+      { id: In(expiredProducts.map((p) => p.id)) },
+      { is_expired: true },
+    );
+
+    this.logger.log(
+      `⏰ Đã đánh dấu ${expiredProducts.length} sản phẩm hết hạn hiển thị.`,
+    );
   }
 }

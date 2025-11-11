@@ -13,7 +13,8 @@ import { ProductsModule } from './modules/products/products.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { ProductAddressesModule } from './modules/product_addresses/product_addresses.module';
-import { VnpayModule } from './modules/payments/vnpay/vnpay.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -67,10 +68,11 @@ import { VnpayModule } from './modules/payments/vnpay/vnpay.module';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'), // thư mục chứa ảnh
     }),
+    ScheduleModule.forRoot(),
     CategoriesModule,
     AddressesModule,
     ProductAddressesModule,
-    VnpayModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

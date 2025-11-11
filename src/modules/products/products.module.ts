@@ -18,5 +18,6 @@ import { ProductAddress } from '../product_addresses/entities/product_address.en
   ],
   controllers: [ProductsController],
   providers: [ProductsService, JwtStrategy],
+  exports: [ProductsService],
 })
 export class ProductsModule {}

@@ -7,6 +7,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
+  OneToMany,
+  DeleteDateColumn,
 } from 'typeorm';
 import { User } from 'src/modules/users/entities/user.entity';
 import {
@@ -16,13 +18,13 @@ import {
 } from '../enums/product.enum';
 import { Category } from 'src/modules/categories/entities/category.entity';
 import { ProductAddress } from 'src/modules/product_addresses/entities/product_address.entity';
+import { Payment } from 'src/modules/payments/entities/payment.entity';
 
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  // Join user
   @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
@@ -43,14 +45,12 @@ export class Product {
   })
   condition: ProductCondition;
 
-  // Join category
   @ManyToOne(() => Category, (category) => category.products, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'category_id' })
   category: Category;
 
-  // One-to-one with ProductAddress
   @OneToOne(() => ProductAddress, (address) => address.product, {
     cascade: true,
   })
@@ -65,8 +65,8 @@ export class Product {
   @Column({ type: 'boolean', default: false })
   is_premium: boolean;
 
-  @Column({ type: 'boolean', default: false })
-  payment_required: boolean;
+  @Column({ type: 'int', default: 0 })
+  priority_level: number;
 
   @Column({
     type: 'enum',
@@ -75,11 +75,12 @@ export class Product {
   })
   status: ProductStatus;
 
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
+  @Column({ type: 'text', nullable: true })
   reject_reason: string | null;
+
+  // Thêm cột is_expired để đánh dấu rõ ràng
+  @Column({ type: 'boolean', default: false })
+  is_expired: boolean;
 
   @Column({ type: 'timestamp', nullable: true })
   expire_at: Date | null;
@@ -94,9 +95,16 @@ export class Product {
   @Column({ type: 'timestamp', nullable: true })
   promotion_expire_at: Date | null;
 
+  @OneToMany(() => Payment, (payment) => payment.product)
+  payments: Payment[];
+
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 
   @UpdateDateColumn({ type: 'timestamp' })
   updated_at: Date;
+
+  // deleted_at CHỈ dùng cho "ẩn tin" (user action)
+  @DeleteDateColumn({ type: 'timestamp', nullable: true })
+  deleted_at: Date | null;
 }

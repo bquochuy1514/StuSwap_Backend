@@ -5,6 +5,7 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -43,17 +44,6 @@ export class AuthController {
   @Post('refresh-token')
   async refreshToken(@Req() req, @Res({ passthrough: true }) res) {
     const result = await this.authService.handleRefreshToken(req.user);
-
-    const { refresh_token } = result;
-
-    res.cookie('refresh_token', refresh_token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
     return result;
   }
 
@@ -95,21 +85,15 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   async googleCallback(@Req() req, @Res() res) {
     if (!req.user) {
-      // Không cần redirect nữa vì Guard đã redirect rồi
-      return;
+      throw new UnauthorizedException('Không thể đăng nhập bằng Google');
     }
 
     const response = await this.authService.loginWithGoogle(req.user);
     const { access_token, refresh_token } = response;
 
-    res.cookie('refresh_token', refresh_token, {
-      httpOnly: true, // không cho JS đọc
-      secure: false, // đổi thành true nếu chạy HTTPS (VD: deploy)
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
-    });
-
-    res.redirect(`${process.env.FRONTEND_URL}?access_token=${access_token}`);
+    // Redirect về frontend với cả access_token và refresh_token
+    res.redirect(
+      `${process.env.FRONTEND_URL}?access_token=${access_token}&refresh_token=${refresh_token}`,
+    );
   }
 }
