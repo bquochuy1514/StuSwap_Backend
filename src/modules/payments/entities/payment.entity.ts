@@ -10,6 +10,7 @@ import {
 import { User } from 'src/modules/users/entities/user.entity';
 import { Product } from 'src/modules/products/entities/product.entity';
 import { PromotionType } from 'src/modules/products/enums/product.enum';
+import { PaymentPurpose } from '../dto/create-payment.dto';
 
 @Entity('payments')
 export class Payment {
@@ -24,6 +25,14 @@ export class Payment {
 
   @Column({ type: 'enum', enum: PromotionType })
   packageType: PromotionType; // Gói thanh toán: BOOST / PRIORITY
+
+  // 🧠 Mục đích thanh toán
+  @Column({
+    type: 'enum',
+    enum: PaymentPurpose,
+    default: PaymentPurpose.PROMOTE_PRODUCT,
+  })
+  purpose: PaymentPurpose;
 
   @Column({ nullable: true })
   checkoutUrl: string; // Link thanh toán trả về từ PayOS (FE redirect tới đây)

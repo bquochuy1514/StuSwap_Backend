@@ -5,7 +5,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -17,6 +16,7 @@ import { UsersService } from '../users/users.service';
 import { SerializedUser } from 'src/common/types';
 import * as path from 'path';
 import * as fs from 'fs';
+import dayjs from 'dayjs';
 import { CategoriesService } from '../categories/categories.service';
 import { ProductAddress } from '../product_addresses/entities/product_address.entity';
 import { ProductStatus, PromotionType } from './enums/product.enum';
@@ -326,7 +326,7 @@ export class ProductsService {
         break;
 
       case PromotionType.PRIORITY:
-        promotionDays = 30; // hoặc 15 nếu muốn
+        promotionDays = 14;
         isPremium = true;
         priorityLevel = 2;
         break;
@@ -351,6 +351,32 @@ export class ProductsService {
     return {
       message: `Đã cập nhật sản phẩm #${product.id} thành gói ${packageType}`,
       product,
+    };
+  }
+
+  async extendProductExpiry(productId: number, extendedDays: number) {
+    const product = await this.productsRepository.findOne({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Không tìm thấy sản phẩm để cập nhật.');
+    }
+
+    const currentExpiry = product.expire_at
+      ? dayjs(product.expire_at)
+      : dayjs();
+
+    const newExpiry = currentExpiry.add(extendedDays, 'day');
+
+    product.expire_at = newExpiry.toDate();
+    await this.productsRepository.save(product);
+
+    return {
+      success: true,
+      message: `Gia hạn thành công ${extendedDays} ngày cho sản phẩm #${productId}`,
+      oldExpiry: currentExpiry.format('YYYY-MM-DD HH:mm:ss'),
+      newExpiry: newExpiry.format('YYYY-MM-DD HH:mm:ss'),
     };
   }
 
@@ -381,7 +407,7 @@ export class ProductsService {
     }
 
     this.logger.log(
-      `⏳ Đã reset ${expiredProducts.length} sản phẩm hết hạn khuyến mãi.`,
+      `⏳ Đã reset ${expiredProducts.length} sản phẩm hết hạn tin đẩy.`,
     );
   }
 
