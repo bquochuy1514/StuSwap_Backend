@@ -5,14 +5,16 @@ import {
   ClassSerializerInterceptor,
   ValidationPipe,
 } from '@nestjs/common';
-import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true, //  Cho phép cookie gửi qua
+    origin: [
+      process.env.FRONTEND_URL,
+      'http://localhost:3000',
+      'https://7674e9171b85.ngrok-free.app',
+    ],
   });
 
   app.setGlobalPrefix('api', { exclude: ['/'] });
@@ -36,8 +38,6 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-
-  app.use(cookieParser());
 
   await app.listen(process.env.PORT);
 }
