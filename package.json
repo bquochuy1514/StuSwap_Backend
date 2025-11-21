@@ -1,5 +1,5 @@
 {
-  "name": "cine-verse_backend",
+  "name": "studentswap_backend",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -18,7 +18,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "seed": "ts-node -r tsconfig-paths/register src/database/seeds/seed.ts",
+    "seed:dev": "NODE_ENV=development npm run seed",
+    "seed:prod": "NODE_ENV=production npm run seed"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "2.0.2",
@@ -45,7 +48,6 @@
     "handlebars": "4.7.8",
     "multer": "2.0.2",
     "mysql2": "3.15.1",
-    "nestjs-vnpay": "^1.0.4",
     "nodemailer": "7.0.6",
     "otp-generator": "4.0.1",
     "passport": "0.7.0",
@@ -55,8 +57,7 @@
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "typeorm": "0.3.27",
-    "uuid": "10.0.0",
-    "vnpay": "^2.4.4"
+    "uuid": "10.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -83,6 +84,7 @@
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
+    "typeorm-extension": "^3.7.1",
     "typescript": "^5.1.3"
   },
   "jest": {

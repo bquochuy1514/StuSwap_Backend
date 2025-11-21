@@ -7,10 +7,13 @@ import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { ProductsModule } from '../products/products.module';
 import { PayosModule } from './payos/payos.module';
+import { Package } from '../packages/entities/package.entity';
+import { Product } from '../products/entities/product.entity';
+import { Order } from '../orders/entities/order.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Payment]),
+    TypeOrmModule.forFeature([Payment, Package, Order, Product]),
     UsersModule,
     AuthModule,
     ProductsModule,

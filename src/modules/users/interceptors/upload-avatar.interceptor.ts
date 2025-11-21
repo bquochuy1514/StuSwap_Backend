@@ -12,8 +12,8 @@ export const UploadAvatar = () =>
       },
     }),
     fileFilter: (req, file, callback) => {
-      if (!file.mimetype.match(/\/(jpg|jpeg|png)$/)) {
-        return callback(new Error('Chỉ cho phép ảnh jpg/jpeg/png'), false);
+      if (!file.mimetype.match(/\/(jpg|jpeg|png|webp)$/)) {
+        return callback(new Error('Chỉ cho phép ảnh jpg/jpeg/png/webp'), false);
       }
       callback(null, true);
     },

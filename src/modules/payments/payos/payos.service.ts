@@ -5,16 +5,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PayOS } from '@payos/node'; // giả sử SDK đúng tên như này
-import { CreatePaymentDto, PaymentPurpose } from '../dto/create-payment.dto';
+import { PayOS } from '@payos/node';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Payment } from '../entities/payment.entity';
 import { Repository } from 'typeorm';
 import { Product } from 'src/modules/products/entities/product.entity';
-import { PromotionType } from 'src/modules/products/enums/product.enum';
 import { UsersService } from 'src/modules/users/users.service';
 import * as crypto from 'crypto';
 import { ProductsService } from 'src/modules/products/products.service';
+import { Package } from 'src/modules/packages/entities/package.entity';
+import { User } from 'src/modules/users/entities/user.entity';
+import { Order } from 'src/modules/orders/entities/order.entity';
 
 @Injectable()
 export class PayosService {
@@ -27,6 +28,8 @@ export class PayosService {
     private readonly paymentRepo: Repository<Payment>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    @InjectRepository(Order)
+    private readonly ordersRepo: Repository<Order>,
     private readonly usersService: UsersService,
     private readonly productsService: ProductsService,
   ) {
@@ -77,130 +80,135 @@ export class PayosService {
     return computedSignature === signature;
   }
 
-  async createPromotePaymentLink(
-    createPaymentDto: CreatePaymentDto,
-    user: any,
-  ) {
-    const { productId, packageType } = createPaymentDto;
-
-    // 1️⃣ Kiểm tra sản phẩm có tồn tại không
+  async createPromotionPayment({
+    pkg,
+    user,
+    productId,
+  }: {
+    pkg: Package;
+    user: User;
+    productId: number;
+  }) {
+    // 1) Kiểm tra product tồn tại
     const product = await this.productRepo.findOne({
-      where: { id: productId },
+      where: { id: productId, user: { id: user.id } },
     });
-    if (!product) throw new NotFoundException('Sản phẩm không tồn tại.');
+    if (!product) {
+      throw new NotFoundException(
+        'Tin đăng không tồn tại hoặc không thuộc quyền sở hữu',
+      );
+    }
 
-    const userDB = await this.usersService.findUserByEmail(user.email);
-    if (!userDB) throw new NotFoundException('Người dùng không tồn tại.');
-
-    // 2️⃣ Xác định số tiền dựa theo loại gói
-    let amount = 0;
-    if (packageType === PromotionType.BOOST) amount = 5000;
-    else if (packageType === PromotionType.PRIORITY) amount = 15000;
-
-    // 3️⃣ Tạo orderCode duy nhất (PayOS yêu cầu)
-    const orderCode = Math.floor(Date.now() / 1000);
-
-    // 4️⃣ Tạo bản ghi thanh toán (PENDING)
-    const payment = this.paymentRepo.create({
-      orderId: orderCode.toString(),
-      amount,
-      packageType,
-      status: 'PENDING',
-      user: userDB,
+    // 2) Tạo ORDER trước (status = PENDING)
+    const order = this.ordersRepo.create({
+      user,
+      package: pkg,
       product,
-      purpose: PaymentPurpose.PROMOTE_PRODUCT,
+      amount: pkg.price,
+      status: 'PENDING',
     });
-    await this.paymentRepo.save(payment);
 
-    // 5️⃣ Tạo link thanh toán qua PayOS
-    const purpose = PaymentPurpose.PROMOTE_PRODUCT;
-    const description =
-      packageType === PromotionType.BOOST
-        ? `Boost sản phẩm #${product.id}`
-        : `Priority sản phẩm #${product.id}`;
-    const returnUrl = `${process.env.FRONTEND_URL}/payment/result?orderId=${payment.id}&product_id=${productId}&purpose=${purpose}`;
-    const cancelUrl = `${process.env.FRONTEND_URL}/payment/result?orderId=${payment.id}&product_id=${productId}&purpose=${purpose}`;
+    const savedOrder = await this.ordersRepo.save(order);
 
-    const response = await this.payOS.paymentRequests.create({
+    // 3) Tạo PAYMENT record (PENDING)
+    const orderCode = Math.floor(Date.now() / 1000);
+    const payment = this.paymentRepo.create({
+      order: savedOrder,
+      provider: 'PAYOS',
+      provider_order_id: orderCode,
+      transaction_id: null,
+      amount: pkg.price,
+      status: 'PENDING',
+      raw_data: null,
+    });
+
+    const savedPayment = await this.paymentRepo.save(payment);
+
+    // 4) Gọi PayOS để tạo payment link
+    const payosResponse = await this.payOS.paymentRequests.create({
+      amount: Number(pkg.price),
+      description: `${pkg.display_name} #${productId}`,
       orderCode,
-      amount,
-      description,
-      returnUrl,
-      cancelUrl,
+      returnUrl: `${this.configService.get('APP_URL')}/payment/success`,
+      cancelUrl: `${this.configService.get('APP_URL')}/payment/cancel`,
     });
 
-    // 6️⃣ Cập nhật lại link thanh toán vào DB
-    payment.checkoutUrl = response.checkoutUrl;
-    await this.paymentRepo.save(payment);
+    if (!payosResponse?.checkoutUrl) {
+      throw new BadRequestException('Không thể tạo link thanh toán PayOS');
+    }
 
-    // 7️⃣ Trả kết quả về FE
+    // 5) Update provider_order_id từ response PayOS
+    savedPayment.provider_order_id = payosResponse.orderCode;
+    savedPayment.raw_data = payosResponse;
+
+    await this.paymentRepo.save(savedPayment);
+
+    // 6) Trả link về FE
     return {
-      paymentId: payment.id,
-      orderCode,
-      checkoutUrl: response.checkoutUrl,
-      qrCode: response.qrCode,
-      amount,
+      checkoutUrl: payosResponse.checkoutUrl,
+      orderId: savedOrder.id,
+      paymentId: savedPayment.id,
     };
   }
 
-  async createRenewPaymentLink(dto: CreatePaymentDto, user: any) {
-    const { productId } = dto;
+  // async createRenewPaymentLink(dto: CreatePaymentDto, user: any) {
+  //   const { productId } = dto;
 
-    // 1️⃣ Kiểm tra sản phẩm
-    const product = await this.productRepo.findOne({
-      where: { id: productId },
-    });
-    if (!product) throw new NotFoundException('Sản phẩm không tồn tại.');
+  //   // 1️⃣ Kiểm tra sản phẩm
+  //   const product = await this.productRepo.findOne({
+  //     where: { id: productId },
+  //   });
+  //   if (!product) throw new NotFoundException('Sản phẩm không tồn tại.');
 
-    const userDB = await this.usersService.findUserByEmail(user.email);
-    if (!userDB) throw new NotFoundException('Người dùng không tồn tại.');
+  //   const userDB = await this.usersService.findUserByEmail(user.email);
+  //   if (!userDB) throw new NotFoundException('Người dùng không tồn tại.');
 
-    // 2️⃣ Xác định giá và thời gian gia hạn
-    const amount = 10000; // 10k / 30 ngày
-    const extendDays = 30;
+  //   // 2️⃣ Xác định giá và thời gian gia hạn
+  //   const amount = 10000; // 10k / 30 ngày
+  //   const extendDays = 30;
 
-    // 3️⃣ Tạo orderCode duy nhất
-    const orderCode = Math.floor(Date.now() / 1000);
+  //   // 3️⃣ Tạo orderCode duy nhất
+  //   const orderCode = Math.floor(Date.now() / 1000);
 
-    // 4️⃣ Tạo bản ghi thanh toán
-    const payment = this.paymentRepo.create({
-      orderId: orderCode.toString(),
-      amount,
-      status: 'PENDING',
-      user: userDB,
-      product,
-      purpose: PaymentPurpose.RENEW_PRODUCT, // 🧠 thêm field này trong entity Payment nếu chưa có
-    });
-    await this.paymentRepo.save(payment);
+  //   // 4️⃣ Tạo bản ghi thanh toán
+  //   const payment = this.paymentRepo.create({
+  //     orderId: orderCode.toString(),
+  //     amount,
+  //     status: 'PENDING',
+  //     user: userDB,
+  //     product,
+  //     purpose: PaymentPurpose.RENEW_PRODUCT, // 🧠 thêm field này trong entity Payment nếu chưa có
+  //   });
+  //   await this.paymentRepo.save(payment);
 
-    // 5️⃣ Tạo link thanh toán qua PayOS
-    const purpose = PaymentPurpose.RENEW_PRODUCT;
-    const description = `Gia hạn san pham #${product.id}`;
-    const returnUrl = `${process.env.FRONTEND_URL}/payment/result?orderId=${payment.id}&product_id=${productId}&purpose=${purpose}`;
-    const cancelUrl = `${process.env.FRONTEND_URL}/payment/result?orderId=${payment.id}&product_id=${productId}&purpose=${purpose}`;
+  //   // 5️⃣ Tạo link thanh toán qua PayOS
+  //   const purpose = PaymentPurpose.RENEW_PRODUCT;
+  //   const description = `Gia hạn san pham #${product.id}`;
+  //   const returnUrl = `${process.env.FRONTEND_URL}/payment/result?orderId=${payment.id}&product_id=${productId}&purpose=${purpose}`;
+  //   const cancelUrl = `${process.env.FRONTEND_URL}/payment/result?orderId=${payment.id}&product_id=${productId}&purpose=${purpose}`;
 
-    const response = await this.payOS.paymentRequests.create({
-      orderCode,
-      amount,
-      description,
-      returnUrl,
-      cancelUrl,
-    });
+  //   const response = await this.payOS.paymentRequests.create({
+  //     orderCode,
+  //     amount,
+  //     description,
+  //     returnUrl,
+  //     cancelUrl,
+  //   });
 
-    // 6️⃣ Cập nhật link thanh toán
-    payment.checkoutUrl = response.checkoutUrl;
-    await this.paymentRepo.save(payment);
+  //   // 6️⃣ Cập nhật link thanh toán
+  //   payment.checkoutUrl = response.checkoutUrl;
+  //   await this.paymentRepo.save(payment);
 
-    // 7️⃣ Trả về FE
-    return {
-      paymentId: payment.id,
-      orderCode,
-      checkoutUrl: response.checkoutUrl,
-      qrCode: response.qrCode,
-      amount,
-      extendDays,
-    };
-  }
+  //   // 7️⃣ Trả về FE
+  //   return {
+  //     paymentId: payment.id,
+  //     orderCode,
+  //     checkoutUrl: response.checkoutUrl,
+  //     qrCode: response.qrCode,
+  //     amount,
+  //     extendDays,
+  //   };
+  // }
 
   //  Xử lý webhook từ PayOS
   async handleWebhook(body: any) {
@@ -228,10 +236,10 @@ export class PayosService {
        */
       const isSuccess = code === '00';
 
-      // 3️⃣ Tìm bản ghi thanh toán tương ứng
+      // 3️⃣ Tìm bản ghi Payment tương ứng
       const payment = await this.paymentRepo.findOne({
-        where: { orderId: orderCode.toString() },
-        relations: ['product'],
+        where: { provider_order_id: orderCode },
+        relations: ['order', 'order.product', 'order.package'],
       });
 
       if (!payment) {
@@ -246,63 +254,106 @@ export class PayosService {
         return { success: true, message: 'Already processed' };
       }
 
-      // 5️⃣ Nếu thanh toán thành công
-      if (isSuccess) {
-        payment.status = 'SUCCESS';
-        payment.transactionId = reference;
-        payment.paidAt = new Date(transactionDateTime);
-        await this.paymentRepo.save(payment);
-
-        switch (payment.purpose) {
-          // Case đẩy tin sản phẩm
-          case PaymentPurpose.PROMOTE_PRODUCT:
-            // Cập nhật thông tin sản phẩm tương ứng
-            await this.productsService.markAsPromotion(
-              payment.product.id,
-              payment.packageType,
-            );
-
-            this.logger.log(
-              `✅ Thanh toán thành công #${orderCode} (${amount} VND) - Đẩy tin sản phẩm #${payment.product.id}`,
-            );
-            break;
-
-          // Case gia hạn sản phẩm
-          case PaymentPurpose.RENEW_PRODUCT:
-            // Gia hạn tin
-            await this.productsService.extendProductExpiry(
-              payment.product.id,
-              30,
-            );
-
-            this.logger.log(
-              `✅ [RENEW] Thanh toán thành công #${orderCode} - Gia hạn tin #${payment.product.id}`,
-            );
-            break;
-
-          // Case mặc định
-          default:
-            this.logger.warn(
-              `⚠️ Loại thanh toán không xác định cho orderCode #${orderCode}`,
-            );
-            break;
-        }
-
-        return { success: true, message: 'Payment processed successfully' };
-      }
-
-      // 6️⃣ Nếu thanh toán thất bại
-      payment.status = 'FAILED';
+      // 5️⃣ Cập nhật Payment và Order
+      payment.status = isSuccess ? 'SUCCESS' : 'FAILED';
+      payment.transaction_id = reference || null;
+      payment.paid_at = isSuccess ? new Date(transactionDateTime) : null;
+      payment.raw_data = body;
       await this.paymentRepo.save(payment);
 
-      this.logger.warn(
-        `⚠️ Thanh toán thất bại #${orderCode} - Mã code: ${code}, desc: ${desc}`,
-      );
+      // Cập nhật trạng thái Order tương ứng
+      payment.order.status = isSuccess ? 'PAID' : 'FAILED';
+      await this.ordersRepo.save(payment.order);
 
-      return { success: false, message: 'Payment failed' };
+      // 6️⃣ Trigger logic business nếu thanh toán thành công
+      const pkgType = payment.order.package.package_type;
+      switch (pkgType) {
+        case 'PROMOTION':
+          if (isSuccess && payment.order.product) {
+            await this.productsService.markAsPromotion(
+              payment.order.product.id,
+              payment.order.package,
+            );
+            this.logger.log(
+              `✅ Đẩy tin thành công cho sản phẩm #${payment.order.product.id}`,
+            );
+          }
+          break;
+        // Các case khác sau này sẽ thêm
+
+        default:
+          this.logger.warn(
+            `⚠️ Loại gói không xác định cho orderCode #${orderCode}`,
+          );
+          break;
+      }
+
+      return {
+        success: isSuccess,
+        message: isSuccess ? 'Thanh toán thành công' : 'Thanh toán thất bại',
+      };
     } catch (error) {
       this.logger.error(`❌ Lỗi xử lý webhook: ${error.message}`, error.stack);
-      throw new BadRequestException('Error handling PayOS webhook');
+      throw new BadRequestException('Lỗi khi xử lý webhook PayOS');
     }
+
+    // 5️⃣ Nếu thanh toán thành công
+    //   if (isSuccess) {
+    //     payment.status = 'SUCCESS';
+    //     payment.transaction_id = reference;
+    //     payment.paid_at = new Date(transactionDateTime);
+    //     await this.paymentRepo.save(payment);
+
+    //     switch (payment.purpose) {
+    //       // Case đẩy tin sản phẩm
+    //       case PaymentPurpose.PROMOTE_PRODUCT:
+    //         // Cập nhật thông tin sản phẩm tương ứng
+    //         await this.productsService.markAsPromotion(
+    //           payment.product.id,
+    //           payment.packageType,
+    //         );
+
+    //         this.logger.log(
+    //           `✅ Thanh toán thành công #${orderCode} (${amount} VND) - Đẩy tin sản phẩm #${payment.product.id}`,
+    //         );
+    //         break;
+
+    //       // Case gia hạn sản phẩm
+    //       case PaymentPurpose.RENEW_PRODUCT:
+    //         // Gia hạn tin
+    //         await this.productsService.extendProductExpiry(
+    //           payment.product.id,
+    //           30,
+    //         );
+
+    //         this.logger.log(
+    //           `✅ [RENEW] Thanh toán thành công #${orderCode} - Gia hạn tin #${payment.product.id}`,
+    //         );
+    //         break;
+
+    //       // Case mặc định
+    //       default:
+    //         this.logger.warn(
+    //           `⚠️ Loại thanh toán không xác định cho orderCode #${orderCode}`,
+    //         );
+    //         break;
+    //     }
+
+    //     return { success: true, message: 'Payment processed successfully' };
+    //   }
+
+    //   // 6️⃣ Nếu thanh toán thất bại
+    //   payment.status = 'FAILED';
+    //   await this.paymentRepo.save(payment);
+
+    //   this.logger.warn(
+    //     `⚠️ Thanh toán thất bại #${orderCode} - Mã code: ${code}, desc: ${desc}`,
+    //   );
+
+    //   return { success: false, message: 'Payment failed' };
+    // } catch (error) {
+    //   this.logger.error(`❌ Lỗi xử lý webhook: ${error.message}`, error.stack);
+    //   throw new BadRequestException('Error handling PayOS webhook');
+    // }
   }
 }

@@ -10,7 +10,7 @@ import {
 import { UserRole } from '../enums/user.enum';
 import { Product } from 'src/modules/products/entities/product.entity';
 import { Address } from 'src/modules/addresses/entities/address.entity';
-import { Payment } from 'src/modules/payments/entities/payment.entity';
+import { Order } from 'src/modules/orders/entities/order.entity';
 
 @Entity('users')
 export class User {
@@ -81,6 +81,6 @@ export class User {
   products: Product[];
 
   // Danh sách các giao dịch thanh toán của user này
-  @OneToMany(() => Payment, (payment) => payment.user)
-  payments: Payment[];
+  @OneToMany(() => Order, (order) => order.user)
+  orders: Order[];
 }

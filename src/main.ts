@@ -13,7 +13,7 @@ async function bootstrap() {
     origin: [
       process.env.FRONTEND_URL,
       'http://localhost:3000',
-      'https://7674e9171b85.ngrok-free.app',
+      '9455710e685d.ngrok-free.app',
     ],
   });
 

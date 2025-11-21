@@ -1,39 +1,110 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PayosService } from './payos/payos.service';
-import { CreatePaymentDto, PaymentPurpose } from './dto/create-payment.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Package } from '../packages/entities/package.entity';
+import { DataSource, Repository } from 'typeorm';
+import { Product } from '../products/entities/product.entity';
+import { Order } from '../orders/entities/order.entity';
+import { Payment } from './entities/payment.entity';
+import { UsersService } from '../users/users.service';
+import { PromotionType } from '../products/enums/product.enum';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly payosService: PayosService) {}
+  constructor(
+    private readonly payosService: PayosService,
 
-  private async handlePromotionPayment(dto: CreatePaymentDto, user: any) {
-    return this.payosService.createPromotePaymentLink(dto, user);
-  }
+    @InjectRepository(Package)
+    private readonly packagesRepo: Repository<Package>,
 
-  private async handleRenewPayment(dto: CreatePaymentDto, user: any) {
-    return this.payosService.createRenewPaymentLink(dto, user);
-  }
+    @InjectRepository(Product)
+    private readonly productsRepo: Repository<Product>,
 
-  private async handleUpgradePayment(dto: CreatePaymentDto, user: any) {
-    // ⚙️ sẽ viết sau — logic nâng cấp tài khoản Premium
-    throw new BadRequestException(
-      'Chức năng nâng cấp tài khoản chưa được triển khai.',
-    );
-  }
+    @InjectRepository(Payment)
+    private readonly paymentsRepo: Repository<Payment>,
 
-  handleCreatePayOsPaymentLink(createPaymentDto: CreatePaymentDto, user: any) {
-    switch (createPaymentDto.paymentPurpose as PaymentPurpose) {
-      case PaymentPurpose.PROMOTE_PRODUCT:
-        return this.handlePromotionPayment(createPaymentDto, user);
+    private readonly dataSource: DataSource,
 
-      case PaymentPurpose.RENEW_PRODUCT:
-        return this.handleRenewPayment(createPaymentDto, user);
+    private readonly userService: UsersService,
+  ) {}
 
-      case PaymentPurpose.UPGRADE_ACCOUNT:
-        return this.handleUpgradePayment(createPaymentDto, user);
+  async handleCreatePayOsPaymentLink(
+    createPaymentDto: CreatePaymentDto,
+    user: any,
+  ) {
+    const userDB = await this.userService.findUserByEmail(user.email);
+    if (!userDB) {
+      throw new NotFoundException('Người dùng không tồn tại trong hệ thống');
+    }
+
+    const { packageId, productId } = createPaymentDto;
+
+    const pkg = await this.packagesRepo.findOne({
+      where: { id: packageId },
+    });
+
+    if (!pkg) {
+      throw new NotFoundException('Gói dịch vụ không tồn tại');
+    }
+
+    switch (pkg.package_type) {
+      case 'PROMOTION':
+        if (!productId) {
+          throw new BadRequestException(
+            'Gói đẩy tin yêu cầu phải có productId (tin đăng cần được đẩy)',
+          );
+        }
+
+        const product = await this.productsRepo.findOne({
+          where: { id: productId },
+        });
+
+        if (
+          product.promotion_type !== PromotionType.NONE &&
+          product.promotion_expire_at &&
+          product.promotion_expire_at > new Date()
+        ) {
+          throw new BadRequestException(
+            'Sản phẩm này đang trong thời gian khuyến mãi, không thể đẩy tin lại.',
+          );
+        }
+
+        return this.payosService.createPromotionPayment({
+          pkg,
+          user: userDB,
+          productId,
+        });
+
+      // case 'RENEW':
+      //   if (!productId) {
+      //     throw new BadRequestException(
+      //       'Gói gia hạn yêu cầu phải có productId (tin đăng cần được gia hạn)',
+      //     );
+      //   }
+
+      //   // Chuyển sang service handle renew
+      //   return this.payosService.createRenewPayment({
+      //     pkg,
+      //     user: userDB,
+      //     productId,
+      //   });
+
+      // case 'MEMBERSHIP':
+      //   // Chuyển sang service handle membership
+      //   return this.payosService.createMembershipPayment({
+      //     pkg,
+      //     user: userDB,
+      //   });
 
       default:
-        throw new BadRequestException('Mục đích thanh toán không hợp lệ');
+        throw new BadRequestException(
+          'Loại gói này hiện chưa được hỗ trợ thanh toán',
+        );
     }
   }
 

@@ -5,9 +5,9 @@ import {
   IsString,
   IsNumber,
   IsEnum,
-  IsBoolean,
   Min,
   IsObject,
+  IsInt,
 } from 'class-validator';
 import { ProductCondition } from '../enums/product.enum';
 import { MinWords } from 'src/common/decorators/min-words.decorator';
@@ -31,27 +31,29 @@ export class CreateProductDto {
   @IsEnum(ProductCondition, { message: 'Tình trạng sản phẩm không hợp lệ' })
   condition?: ProductCondition;
 
-  @IsNumber({}, { message: 'Danh mục phải là số' })
+  @IsInt({ message: 'Danh mục phải là số nguyên' })
+  @Transform(({ value }) => {
+    // Nếu là empty string hoặc falsy, return undefined để @IsNotEmpty bắt
+    if (!value || value === '') {
+      return undefined;
+    }
+    const num = parseInt(value, 10);
+    return isNaN(num) ? undefined : num;
+  })
   @IsNotEmpty({ message: 'Danh mục không được để trống' })
   category_id: number;
 
-  // --- Địa chỉ sản phẩm ---
-  @IsObject({ message: 'Địa chỉ sản phẩm phải là một object' })
-  @IsNotEmpty({ message: 'Vị trí sản phẩm không được để trống' })
-  address?: {
-    specificAddress?: string;
-    ward?: string;
-    district?: string;
-    province?: string;
+  @IsObject()
+  @IsNotEmpty({
+    message:
+      'Địa chỉ sản phẩm thiếu thông tin. Vui lòng điền đầy đủ các trường yêu cầu.',
+  })
+  address: {
+    specificAddress: string;
+    ward: string;
+    district: string;
+    province: string;
   };
 
   image_urls?: string;
-
-  @IsOptional()
-  @IsBoolean({ message: 'is_sold phải là kiểu boolean' })
-  is_sold?: boolean;
-
-  @IsOptional()
-  @IsBoolean({ message: 'is_premium phải là kiểu boolean' })
-  is_premium?: boolean;
 }

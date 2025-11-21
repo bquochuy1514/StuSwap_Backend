@@ -15,6 +15,8 @@ import { AddressesModule } from './modules/addresses/addresses.module';
 import { ProductAddressesModule } from './modules/product_addresses/product_addresses.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { PackagesModule } from './modules/packages/packages.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -73,6 +75,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     AddressesModule,
     ProductAddressesModule,
     PaymentsModule,
+    PackagesModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

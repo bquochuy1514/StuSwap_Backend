@@ -19,13 +19,17 @@ import {
 import { Category } from 'src/modules/categories/entities/category.entity';
 import { ProductAddress } from 'src/modules/product_addresses/entities/product_address.entity';
 import { Payment } from 'src/modules/payments/entities/payment.entity';
+import { Order } from 'src/modules/orders/entities/order.entity';
 
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.products, {
+    onDelete: 'CASCADE',
+    nullable: false,
+  })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
@@ -47,12 +51,14 @@ export class Product {
 
   @ManyToOne(() => Category, (category) => category.products, {
     onDelete: 'CASCADE',
+    nullable: false,
   })
   @JoinColumn({ name: 'category_id' })
   category: Category;
 
   @OneToOne(() => ProductAddress, (address) => address.product, {
     cascade: true,
+    nullable: false,
   })
   address: ProductAddress;
 
@@ -61,9 +67,6 @@ export class Product {
 
   @Column({ type: 'boolean', default: false })
   is_sold: boolean;
-
-  @Column({ type: 'boolean', default: false })
-  is_premium: boolean;
 
   @Column({ type: 'int', default: 0 })
   priority_level: number;
@@ -95,8 +98,8 @@ export class Product {
   @Column({ type: 'timestamp', nullable: true })
   promotion_expire_at: Date | null;
 
-  @OneToMany(() => Payment, (payment) => payment.product)
-  payments: Payment[];
+  @OneToMany(() => Order, (order) => order.product)
+  orders: Order[];
 
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;

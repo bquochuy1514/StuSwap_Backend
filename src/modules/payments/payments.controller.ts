@@ -19,7 +19,7 @@ export class PaymentsController {
 
   // lt --port 8080 --subdomain huydev
   @UseGuards(JwtAuthGuard)
-  @Post('/payos/create-payment-link')
+  @Post('/payos/create-link')
   createPaymentLink(@Body() createPaymentDto: CreatePaymentDto, @Req() req) {
     return this.paymentsService.handleCreatePayOsPaymentLink(
       createPaymentDto,

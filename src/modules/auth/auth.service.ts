@@ -29,6 +29,7 @@ import { GoogleLoginDto } from './dto/google-login.dto';
 import refreshJwtConfig from './config/refresh-jwt.config';
 import { ConfigType } from '@nestjs/config';
 import * as argon2 from 'argon2';
+import { join } from 'path';
 
 @Injectable()
 export class AuthService {
@@ -121,12 +122,19 @@ export class AuthService {
     // Sending email
     this.mailerService.sendMail({
       to: createdUser.email, // list of receivers
-      subject: 'Kích hoạt tài khoản CineVerse', // Subject line
+      subject: 'Kích hoạt tài khoản StudentSwap', // Subject line
       template: 'register.hbs', // HTML body content
       context: {
         name: createdUser.fullName,
         activationCode: createdUser.codeId,
       },
+      attachments: [
+        {
+          filename: 'logo.png',
+          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+          cid: 'logo', // Content ID để reference trong template
+        },
+      ],
     });
 
     await this.usersRepository.save(createdUser);
@@ -296,12 +304,19 @@ export class AuthService {
     // Sending email
     await this.mailerService.sendMail({
       to: user.email, // list of receivers
-      subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản CineVerse', // Subject line
+      subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản StudentSwap', // Subject line
       template: 'forgot-password.hbs', // HTML body content
       context: {
         name: user.fullName,
         activationCode: OTPCode,
       },
+      attachments: [
+        {
+          filename: 'logo.png',
+          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+          cid: 'logo', // Content ID để reference trong template
+        },
+      ],
     });
 
     await this.usersRepository.save(user);

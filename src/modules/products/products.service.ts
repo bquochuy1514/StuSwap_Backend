@@ -21,6 +21,7 @@ import { CategoriesService } from '../categories/categories.service';
 import { ProductAddress } from '../product_addresses/entities/product_address.entity';
 import { ProductStatus, PromotionType } from './enums/product.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Package } from '../packages/entities/package.entity';
 
 @Injectable()
 export class ProductsService {
@@ -305,7 +306,7 @@ export class ProductsService {
     return { message: 'Đã hiển thị lại sản phẩm thành công' };
   }
 
-  async markAsPromotion(productId: number, packageType: PromotionType) {
+  async markAsPromotion(productId: number, pkg: Package) {
     const product = await this.productsRepository.findOne({
       where: { id: productId },
     });
@@ -314,44 +315,23 @@ export class ProductsService {
       throw new NotFoundException('Không tìm thấy sản phẩm để cập nhật.');
     }
 
-    let promotionDays = 0;
-    let isPremium = false;
-    let priorityLevel = 0;
-
-    switch (packageType) {
-      case PromotionType.BOOST:
-        promotionDays = 7; // hiển thị đầu danh sách trong 7 ngày
-        isPremium = false;
-        priorityLevel = 1;
-        break;
-
-      case PromotionType.PRIORITY:
-        promotionDays = 14;
-        isPremium = true;
-        priorityLevel = 2;
-        break;
-
-      default:
-        promotionDays = 0;
-        isPremium = false;
-        priorityLevel = 0;
-        break;
+    // Cập nhật promotion type
+    if (pkg.promotion_type === 'BOOST') {
+      product.promotion_type = PromotionType.BOOST;
+      product.promotion_expire_at = new Date(
+        Date.now() + pkg.duration_hours * 3600 * 1000,
+      );
+    } else if (pkg.promotion_type === 'PRIORITY') {
+      product.promotion_type = PromotionType.PRIORITY;
+      product.promotion_expire_at = new Date(
+        Date.now() + pkg.duration_hours * 3600 * 1000,
+      );
     }
-
-    const expireAt = new Date();
-    expireAt.setDate(expireAt.getDate() + promotionDays);
-
-    product.promotion_type = packageType;
-    product.promotion_expire_at = expireAt;
-    product.is_premium = isPremium;
-    product.priority_level = priorityLevel;
+    product.priority_level = pkg.priority_level;
 
     await this.productsRepository.save(product);
 
-    return {
-      message: `Đã cập nhật sản phẩm #${product.id} thành gói ${packageType}`,
-      product,
-    };
+    return product;
   }
 
   async extendProductExpiry(productId: number, extendedDays: number) {
@@ -380,7 +360,7 @@ export class ProductsService {
     };
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron(CronExpression.EVERY_6_HOURS)
   async handleExpiredPromotions() {
     const now = new Date();
 
@@ -400,7 +380,6 @@ export class ProductsService {
     // Reset về trạng thái thường
     for (const product of expiredProducts) {
       product.promotion_type = PromotionType.NONE;
-      product.is_premium = false;
       product.promotion_expire_at = null;
       product.priority_level = 0;
       await this.productsRepository.save(product);

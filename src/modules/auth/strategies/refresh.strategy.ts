@@ -34,6 +34,7 @@ export class RefreshJwtStrategy extends PassportStrategy(
   }
 
   async validate(req: Request, payload: any) {
+    console.log('Refresh Token is performing...');
     // Lấy refresh token từ Authorization header
     const refreshToken = req.headers.authorization
       ?.replace('Bearer', '')

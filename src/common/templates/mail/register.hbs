@@ -2,7 +2,7 @@
   <head>
     <meta charset='UTF-8' />
     <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-    <title>CineVerse - Kích hoạt tài khoản</title>
+    <title>Student Swap - Kích hoạt tài khoản</title>
     <style>
       * {
         margin: 0;
@@ -18,35 +18,29 @@
           'Helvetica Neue', Arial, sans-serif;
         background: linear-gradient(
           135deg,
-          #0f172a 0%,
-          #1e1b4b 50%,
-          #312e81 100%
+          #064e3b 0%,
+          #047857 50%,
+          #059669 100%
         );
-        color: #e5e7eb;
+        color: #1f2937;
         min-height: 100vh;
         padding: 30px 20px;
       }
 
       .container {
-        max-width: 580px;
+        max-width: 600px;
         margin: 0 auto;
-        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-        border-radius: 20px;
+        background: #ffffff;
+        border-radius: 16px;
         overflow: hidden;
         box-shadow:
-          0 20px 40px -12px rgba(0, 0, 0, 0.5),
-          0 0 0 1px rgba(139, 92, 246, 0.1);
-        border: 1px solid rgba(139, 92, 246, 0.2);
+          0 20px 40px -12px rgba(0, 0, 0, 0.25),
+          0 0 0 1px rgba(16, 185, 129, 0.1);
       }
 
       .header {
-        background: linear-gradient(
-          135deg,
-          #9333ea 0%,
-          #a855f7 50%,
-          #ec4899 100%
-        );
-        padding: 35px 30px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        padding: 40px 30px;
         text-align: center;
         position: relative;
         overflow: hidden;
@@ -62,7 +56,7 @@
         background: linear-gradient(
           90deg,
           transparent,
-          rgba(255, 255, 255, 0.2),
+          rgba(255, 255, 255, 0.15),
           transparent
         );
         animation: shimmer 3s infinite;
@@ -77,12 +71,21 @@
         }
       }
 
+      .logo {
+        width: 290px;
+        height: 100px;
+        object-fit: contain;
+        padding: 8px;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
       .header h1 {
         font-size: 32px;
         margin: 0;
         font-weight: 800;
         color: #ffffff;
-        text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         letter-spacing: -0.5px;
         position: relative;
         z-index: 1;
@@ -98,74 +101,60 @@
       }
 
       .content {
-        padding: 30px;
-        background: rgba(17, 24, 39, 0.5);
-        backdrop-filter: blur(10px);
+        padding: 40px 30px;
+        background: #ffffff;
       }
 
       .greeting {
-        font-size: 22px;
+        font-size: 24px;
         margin-bottom: 20px;
-        color: #f3f4f6;
+        color: #111827;
         text-align: center;
         font-weight: 700;
         word-wrap: break-word;
       }
 
       .greeting-name {
-        background: linear-gradient(135deg, #a855f7, #ec4899);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        display: inline-block;
+        color: #10b981;
       }
 
       .intro-text {
         font-size: 15px;
         line-height: 1.7;
-        color: #d1d5db;
-        margin-bottom: 24px;
+        color: #4b5563;
+        margin-bottom: 28px;
         text-align: center;
       }
 
       .code-container {
-        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-        border: 2px solid rgba(168, 85, 247, 0.3);
-        border-radius: 14px;
-        padding: 24px 20px;
-        margin: 24px 0;
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        border: 2px solid #10b981;
+        border-radius: 12px;
+        padding: 28px 20px;
+        margin: 28px 0;
         text-align: center;
-        box-shadow:
-          0 8px 24px rgba(168, 85, 247, 0.15),
-          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
       }
 
       .code-label {
-        font-size: 12px;
-        color: #9ca3af;
+        font-size: 13px;
+        color: #059669;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 12px;
-        font-weight: 600;
+        letter-spacing: 1.2px;
+        margin-bottom: 14px;
+        font-weight: 700;
       }
 
       .activation-code {
         display: inline-block;
-        background: linear-gradient(
-          135deg,
-          #9333ea 0%,
-          #a855f7 50%,
-          #ec4899 100%
-        );
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: #ffffff;
-        padding: 14px 28px;
+        padding: 16px 32px;
         border-radius: 10px;
-        font-size: 28px;
+        font-size: 32px;
         font-weight: 800;
-        letter-spacing: 6px;
-        box-shadow:
-          0 8px 20px rgba(147, 51, 234, 0.3),
-          0 0 0 3px rgba(168, 85, 247, 0.1);
+        letter-spacing: 8px;
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
         font-family: 'Courier New', monospace;
         word-break: break-all;
         max-width: 100%;
@@ -174,71 +163,65 @@
       .timer-text {
         margin-top: 16px;
         font-size: 14px;
-        color: #d1d5db;
+        color: #059669;
+        font-weight: 500;
       }
 
       .timer-text strong {
-        color: #fbbf24;
+        color: #047857;
         font-weight: 700;
       }
 
       .warning-text {
         text-align: center;
-        color: #9ca3af;
+        color: #6b7280;
         font-size: 14px;
-        margin-top: 18px;
+        margin-top: 20px;
         font-style: italic;
       }
 
       .note {
-        background: linear-gradient(
-          135deg,
-          rgba(251, 191, 36, 0.1) 0%,
-          rgba(245, 158, 11, 0.1) 100%
-        );
-        border: 1px solid rgba(251, 191, 36, 0.3);
+        background: #fef3c7;
+        border: 1px solid #fbbf24;
         border-radius: 10px;
         padding: 16px;
         margin: 24px 0;
         font-size: 14px;
-        color: #fbbf24;
+        color: #92400e;
         display: flex;
         align-items: flex-start;
-        gap: 10px;
+        gap: 12px;
       }
 
       .note-icon {
-        font-size: 18px;
+        font-size: 20px;
         flex-shrink: 0;
         margin-top: 1px;
       }
 
       .note strong {
-        color: #fcd34d;
+        color: #78350f;
         font-weight: 700;
       }
 
       .note-content {
         flex: 1;
         min-width: 0;
+        line-height: 1.5;
       }
 
       .features {
-        margin: 24px 0;
-        padding: 24px;
-        background: linear-gradient(
-          135deg,
-          rgba(139, 92, 246, 0.05) 0%,
-          rgba(236, 72, 153, 0.05) 100%
-        );
-        border-radius: 14px;
-        border: 1px solid rgba(139, 92, 246, 0.1);
+        margin: 28px 0;
+        padding: 28px;
+        background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+        border-radius: 12px;
+        border: 1px solid #a7f3d0;
       }
 
       .features h3 {
         font-size: 18px;
-        margin-bottom: 18px;
-        color: #f3f4f6;
+        margin-bottom: 20px;
+        color: #047857;
         text-align: center;
         font-weight: 700;
       }
@@ -246,14 +229,14 @@
       .feature-item {
         display: flex;
         align-items: center;
-        padding: 12px;
-        margin-bottom: 10px;
-        background: rgba(31, 41, 55, 0.5);
+        padding: 14px;
+        margin-bottom: 12px;
+        background: #ffffff;
         border-radius: 8px;
-        border: 1px solid rgba(75, 85, 99, 0.3);
+        border: 1px solid #d1fae5;
         transition: all 0.3s ease;
         font-size: 14px;
-        color: #d1d5db;
+        color: #374151;
       }
 
       .feature-item:last-child {
@@ -261,10 +244,9 @@
       }
 
       .feature-icon {
-        font-size: 20px;
+        font-size: 22px;
         margin-right: 12px;
         flex-shrink: 0;
-        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
       }
 
       .feature-text {
@@ -273,11 +255,11 @@
       }
 
       .footer {
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-        color: #9ca3af;
+        background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+        color: #6b7280;
         text-align: center;
-        padding: 24px 30px;
-        border-top: 1px solid rgba(139, 92, 246, 0.2);
+        padding: 28px 30px;
+        border-top: 1px solid #d1fae5;
       }
 
       .footer p {
@@ -291,130 +273,102 @@
       }
 
       .footer a {
-        color: #a855f7;
+        color: #10b981;
         text-decoration: none;
         font-weight: 600;
         transition: color 0.3s ease;
         word-break: break-word;
       }
 
-      .footer a:hover {
-        color: #ec4899;
-      }
-
       .divider {
         height: 1px;
-        background: linear-gradient(
-          90deg,
-          transparent,
-          rgba(139, 92, 246, 0.3),
-          transparent
-        );
-        margin: 24px 0;
+        background: linear-gradient(90deg, transparent, #d1fae5, transparent);
+        margin: 28px 0;
       }
 
       @media only screen and (max-width: 600px) {
         body {
           padding: 15px 10px;
         }
-
         .container {
-          border-radius: 16px;
+          border-radius: 12px;
           max-width: 100%;
         }
-
         .header {
-          padding: 28px 20px;
+          padding: 32px 20px;
         }
 
         .header h1 {
           font-size: 26px;
         }
-
         .header p {
           font-size: 14px;
         }
-
         .content {
-          padding: 24px 16px;
+          padding: 28px 20px;
         }
-
         .greeting {
-          font-size: 19px;
+          font-size: 20px;
           margin-bottom: 16px;
         }
-
         .intro-text {
           font-size: 14px;
           line-height: 1.6;
+          margin-bottom: 24px;
         }
-
         .code-container {
-          padding: 20px 12px;
-          margin: 20px 0;
+          padding: 24px 16px;
+          margin: 24px 0;
         }
-
         .code-label {
-          font-size: 11px;
-          margin-bottom: 10px;
+          font-size: 12px;
+          margin-bottom: 12px;
         }
-
         .activation-code {
-          font-size: 22px;
-          padding: 12px 16px;
-          letter-spacing: 4px;
-          word-break: break-all;
+          font-size: 26px;
+          padding: 14px 24px;
+          letter-spacing: 6px;
         }
-
         .timer-text {
           font-size: 13px;
-          margin-top: 12px;
+          margin-top: 14px;
         }
-
         .warning-text {
           font-size: 13px;
+          margin-top: 16px;
         }
-
         .note {
           padding: 14px;
           margin: 20px 0;
           font-size: 13px;
-          gap: 8px;
+          gap: 10px;
         }
-
         .note-icon {
-          font-size: 16px;
+          font-size: 18px;
         }
-
         .divider {
-          margin: 20px 0;
+          margin: 24px 0;
         }
-
         .features {
-          padding: 18px 12px;
-          margin: 20px 0;
+          padding: 20px 16px;
+          margin: 24px 0;
         }
-
         .features h3 {
-          font-size: 16px;
-          margin-bottom: 14px;
+          font-size: 17px;
+          margin-bottom: 16px;
         }
-
         .feature-item {
-          padding: 10px 8px;
-          margin-bottom: 8px;
+          padding: 12px;
+          margin-bottom: 10px;
           font-size: 13px;
         }
-
         .feature-icon {
-          font-size: 18px;
+          font-size: 20px;
           margin-right: 10px;
         }
-
         .footer {
-          padding: 20px 16px;
+          padding: 24px 20px;
         }
-
         .footer p {
           font-size: 12px;
         }
@@ -422,29 +376,25 @@
 
       @media only screen and (max-width: 400px) {
         body {
-          padding: 10px 5px;
+          padding: 10px 8px;
         }
-
         .header h1 {
           font-size: 24px;
         }
-
         .content {
-          padding: 20px 12px;
+          padding: 24px 16px;
         }
-
         .greeting {
           font-size: 18px;
         }
-
         .activation-code {
-          font-size: 20px;
-          padding: 10px 12px;
-          letter-spacing: 3px;
+          font-size: 22px;
+          padding: 12px 20px;
+          letter-spacing: 5px;
         }
-
         .feature-item {
           font-size: 12px;
+          padding: 10px;
         }
       }
     </style>
@@ -452,13 +402,12 @@
 
   <body>
     <div class='container'>
-      <!-- Header -->
       <div class='header'>
-        <h1>🎬 CineVerse</h1>
-        <p>Khám phá thế giới điện ảnh của bạn!</p>
+        <img src='cid:logo' alt='Student Swap Logo' class='logo' />
+        <h1>Student Swap</h1>
+        <p>Nền tảng mua bán đồ cũ sinh viên</p>
       </div>
 
-      <!-- Content -->
       <div class='content'>
         <h2 class='greeting'>
           Xin chào
@@ -467,11 +416,10 @@
 
         <p class='intro-text'>
           Cảm ơn bạn đã đăng ký tài khoản tại
-          <strong>CineVerse</strong>. Để hoàn tất quá trình đăng ký, vui lòng sử
-          dụng mã kích hoạt bên dưới:
+          <strong>Student Swap</strong>. Để hoàn tất quá trình đăng ký, vui lòng
+          sử dụng mã kích hoạt bên dưới:
         </p>
 
-        <!-- Activation Code -->
         <div class='code-container'>
           <div class='code-label'>Mã kích hoạt của bạn</div>
           <div class='activation-code'>{{activationCode}}</div>
@@ -482,10 +430,9 @@
         </div>
 
         <p class='warning-text'>
-          Nếu bạn không đăng ký tài khoản CineVerse, hãy bỏ qua email này.
+          Nếu bạn không đăng ký tài khoản Student Swap, hãy bỏ qua email này.
         </p>
 
-        <!-- Note -->
         <div class='note'>
           <div class='note-icon'>⚠️</div>
           <div class='note-content'>
@@ -497,37 +444,34 @@
 
         <div class='divider'></div>
 
-        <!-- Features -->
         <div class='features'>
-          <h3>✨ Những điều bạn có thể làm</h3>
+          <h3>🎓 Những điều bạn có thể làm với Student Swap</h3>
           <div class='feature-item'>
-            <span class='feature-icon'>🎥</span>
-            <span class='feature-text'>Khám phá hàng ngàn bộ phim đặc sắc</span>
+            <span class='feature-icon'>📚</span>
+            <span class='feature-text'>Mua bán sách giáo khoa, tài liệu học tập</span>
           </div>
           <div class='feature-item'>
-            <span class='feature-icon'>⭐</span>
-            <span class='feature-text'>Đánh giá và bình luận về phim yêu thích</span>
+            <span class='feature-icon'>💻</span>
+            <span class='feature-text'>Trao đổi đồ điện tử, thiết bị học tập</span>
           </div>
           <div class='feature-item'>
-            <span class='feature-icon'>📱</span>
-            <span class='feature-text'>Tạo danh sách phim cá nhân</span>
+            <span class='feature-icon'>👕</span>
+            <span class='feature-text'>Mua sắm quần áo, đồ dùng cá nhân giá rẻ</span>
           </div>
           <div class='feature-item'>
-            <span class='feature-icon'>🔔</span>
-            <span class='feature-text'>Nhận thông báo phim mới và ưu đãi đặc
-              biệt</span>
+            <span class='feature-icon'>🤝</span>
+            <span class='feature-text'>Kết nối với cộng đồng sinh viên gần bạn</span>
           </div>
         </div>
       </div>
 
-      <!-- Footer -->
       <div class='footer'>
         <p>
-          Nếu bạn cần hỗ trợ, vui lòng liên hệ với chúng tôi qua email:<br />
-          <a href='mailto:support@cineverse.com'>support@cineverse.com</a>
+          Cần hỗ trợ? Liên hệ với chúng tôi qua:<br />
+          <a href='mailto:bquochuy260405@gmail.com'>bquochuy260405@gmail.com</a>
         </p>
-        <p style='margin-top: 12px; opacity: 0.7;'>
-          © 2025 CineVerse. Tất cả quyền được bảo lưu.
+        <p style='margin-top: 14px; opacity: 0.7; font-size: 12px;'>
+          © 2025 Student Swap. Nền tảng mua bán đồ cũ sinh viên uy tín.
         </p>
       </div>
     </div>

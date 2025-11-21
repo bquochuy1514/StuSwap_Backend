@@ -6,10 +6,11 @@ import { Payment } from '../entities/payment.entity';
 import { Product } from 'src/modules/products/entities/product.entity';
 import { UsersModule } from 'src/modules/users/users.module';
 import { ProductsModule } from 'src/modules/products/products.module';
+import { Order } from 'src/modules/orders/entities/order.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Payment, Product]),
+    TypeOrmModule.forFeature([Payment, Product, Order]),
     UsersModule,
     ProductsModule,
   ],
