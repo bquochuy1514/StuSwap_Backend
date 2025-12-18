@@ -14,7 +14,6 @@ export const promotionPackages = [
     extend_days: null,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
   {
     key: 'boost_24h',
@@ -30,7 +29,6 @@ export const promotionPackages = [
     extend_days: null,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
   {
     key: 'boost_72h',
@@ -46,7 +44,6 @@ export const promotionPackages = [
     extend_days: null,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
 
   // PRIORITY
@@ -64,7 +61,6 @@ export const promotionPackages = [
     extend_days: null,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
   {
     key: 'priority_72h',
@@ -80,7 +76,6 @@ export const promotionPackages = [
     extend_days: null,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
   {
     key: 'priority_168h',
@@ -96,6 +91,5 @@ export const promotionPackages = [
     extend_days: null,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
 ];

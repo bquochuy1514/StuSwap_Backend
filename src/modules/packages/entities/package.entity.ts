@@ -61,9 +61,6 @@ export class Package {
   @Column({ nullable: true })
   max_posts: number | null;
 
-  @Column({ default: false })
-  premium_badge: boolean;
-
   @OneToMany(() => Order, (order) => order.package)
   orders: Order[];
 

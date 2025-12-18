@@ -210,4 +210,197 @@ export class UsersService {
 
     return { message: 'Người dùng đã bị vô hiệu hóa' };
   }
+
+  /**
+   * Kiểm tra và xử lý quota khi user đăng bài
+   * @returns { canPost: boolean, reason?: string, remainingQuota: number }
+   */
+  async checkAndConsumePostQuota(userId: number): Promise<{
+    canPost: boolean;
+    reason?: string;
+    remainingQuota: number;
+    quotaType: 'FREE' | 'MEMBERSHIP';
+  }> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    const now = new Date();
+
+    // ============================================
+    // BƯỚC 1: Check MEMBERSHIP trước (ưu tiên cao hơn)
+    // ============================================
+    if (user.membershipType && user.membershipExpiresAt) {
+      // Kiểm tra membership còn hạn không
+      if (user.membershipExpiresAt > now) {
+        // Membership còn hạn
+
+        // VIP = unlimited posts
+        if (user.membershipPostQuota === null) {
+          return {
+            canPost: true,
+            remainingQuota: -1, // -1 nghĩa là unlimited
+            quotaType: 'MEMBERSHIP',
+          };
+        }
+
+        // Membership có giới hạn (BASIC, PREMIUM)
+        if (user.membershipPostUsed < user.membershipPostQuota) {
+          // Còn quota → trừ 1
+          user.membershipPostUsed += 1;
+          await this.usersRepository.save(user);
+
+          return {
+            canPost: true,
+            remainingQuota: user.membershipPostQuota - user.membershipPostUsed,
+            quotaType: 'MEMBERSHIP',
+          };
+        } else {
+          // Hết quota membership
+          return {
+            canPost: false,
+            reason: `Bạn đã sử dụng hết ${user.membershipPostQuota} bài đăng trong gói ${user.membershipType}. Vui lòng nâng cấp gói hoặc chờ đến khi membership hết hạn để dùng gói FREE.`,
+            remainingQuota: 0,
+            quotaType: 'MEMBERSHIP',
+          };
+        }
+      } else {
+        // Membership HẾT HẠN → Reset về FREE
+        user.membershipType = null;
+        user.membershipExpiresAt = null;
+        user.membershipPostQuota = null;
+        user.membershipPostUsed = 0;
+        await this.usersRepository.save(user);
+        // Sau khi reset, tiếp tục check FREE bên dưới
+      }
+    }
+
+    // ============================================
+    // BƯỚC 2: Không có membership hoặc đã hết hạn → Dùng FREE
+    // ============================================
+
+    // Kiểm tra xem có cần reset FREE quota không (chu kỳ 30 ngày)
+    if (!user.freeQuotaResetAt || user.freeQuotaResetAt <= now) {
+      // Lần đầu hoặc đã hết chu kỳ → Reset FREE quota
+      user.freePostUsed = 0;
+      user.freeQuotaResetAt = new Date(
+        now.getTime() + 30 * 24 * 60 * 60 * 1000,
+      ); // +30 ngày
+      await this.usersRepository.save(user);
+    }
+
+    // Check FREE quota
+    if (user.freePostUsed < user.freePostQuota) {
+      // Còn quota FREE → trừ 1
+      user.freePostUsed += 1;
+      await this.usersRepository.save(user);
+
+      return {
+        canPost: true,
+        remainingQuota: user.freePostQuota - user.freePostUsed,
+        quotaType: 'FREE',
+      };
+    } else {
+      // Hết quota FREE
+      const resetDate = user.freeQuotaResetAt.toLocaleDateString('vi-VN');
+      return {
+        canPost: false,
+        reason: `Bạn đã sử dụng hết ${user.freePostQuota} bài đăng miễn phí. Quota sẽ được làm mới vào ${resetDate} hoặc bạn có thể mua gói membership để đăng thêm.`,
+        remainingQuota: 0,
+        quotaType: 'FREE',
+      };
+    }
+  }
+
+  async handleGetMembershipInfo(userId: number) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ['products'], // Lấy quan hệ products để tính stats
+    });
+
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    const now = new Date();
+
+    // ============================================
+    // 1. XỬ LÝ QUOTA INFO
+    // ============================================
+    let quotaInfo: any;
+
+    // Check membership còn hạn không
+    const hasMembership =
+      user.membershipType &&
+      user.membershipExpiresAt &&
+      user.membershipExpiresAt > now;
+
+    if (hasMembership) {
+      // Có membership còn hạn
+      quotaInfo = {
+        type: 'MEMBERSHIP',
+        membershipType: user.membershipType,
+        currentUsed: user.membershipPostUsed,
+        totalQuota: user.membershipPostQuota, // null nếu VIP (unlimited)
+        remaining:
+          user.membershipPostQuota === null
+            ? null // unlimited
+            : user.membershipPostQuota - user.membershipPostUsed,
+        resetAt: null,
+        expiresAt: user.membershipExpiresAt.toISOString(),
+      };
+    } else {
+      // Không có membership → dùng FREE
+      // Kiểm tra xem có cần reset FREE quota không
+      if (!user.freeQuotaResetAt || user.freeQuotaResetAt <= now) {
+        // Reset FREE quota nếu hết chu kỳ
+        user.freePostUsed = 0;
+        user.freeQuotaResetAt = new Date(
+          now.getTime() + 30 * 24 * 60 * 60 * 1000,
+        );
+        await this.usersRepository.save(user);
+      }
+
+      quotaInfo = {
+        type: 'FREE',
+        membershipType: null,
+        currentUsed: user.freePostUsed,
+        totalQuota: user.freePostQuota,
+        remaining: user.freePostQuota - user.freePostUsed,
+        resetAt: user.freeQuotaResetAt.toISOString(),
+        expiresAt: null,
+      };
+    }
+
+    // ============================================
+    // 2. TÍNH STATS TỪ PRODUCTS
+    // ============================================
+    const products = user.products || [];
+
+    // Tổng số bài đã đăng
+    const totalPosts = products.length;
+
+    // Bài đang hoạt động (chưa hết hạn)
+    const activePosts = products.filter(
+      (product) => product.expire_at && new Date(product.expire_at) > now,
+    ).length;
+
+    // Bài hết hạn
+    const expiredPosts = products.filter(
+      (product) => product.expire_at && new Date(product.expire_at) <= now,
+    ).length;
+
+    // ============================================
+    // 3. TRẢ VỀ KẾT QUẢ
+    // ============================================
+    return {
+      quota: quotaInfo,
+      stats: {
+        totalPosts,
+        activePosts,
+        expiredPosts,
+      },
+    };
+  }
 }

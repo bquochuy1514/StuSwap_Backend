@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Headers,
-  Logger,
-  Post,
-  Req,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Logger, Post, Req, UseGuards } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,14 +14,14 @@ export class PaymentsController {
   createPaymentLink(@Body() createPaymentDto: CreatePaymentDto, @Req() req) {
     return this.paymentsService.handleCreatePayOsPaymentLink(
       createPaymentDto,
-      req,
+      req.user,
     );
   }
 
   // PayOS gọi webhook
   @Post('/payos/webhook')
   async payosWebhook(@Body() payload: any) {
-    this.logger.log(`📩 Webhook received: ${JSON.stringify(payload)}`);
+    // this.logger.log(`📩 Webhook received: ${JSON.stringify(payload)}`);
     return this.paymentsService.handlePayOsWebhook(payload);
   }
 }

@@ -268,12 +268,19 @@ export class AuthService {
     // Sending email
     this.mailerService.sendMail({
       to: user.email, // list of receivers
-      subject: 'Kích hoạt tài khoản CineVerse', // Subject line
+      subject: 'Kích hoạt tài khoản StudentSwap', // Subject line
       template: 'register.hbs', // HTML body content
       context: {
         name: user.fullName,
         activationCode: user.codeId,
       },
+      attachments: [
+        {
+          filename: 'logo.png',
+          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+          cid: 'logo', // Content ID để reference trong template
+        },
+      ],
     });
 
     return { message: 'Mã xác nhận mới đã được gửi đến email của bạn.' };
@@ -345,12 +352,19 @@ export class AuthService {
     // Sending email
     await this.mailerService.sendMail({
       to: user.email, // list of receivers
-      subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản CineVerse', // Subject line
+      subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản StudentSwap', // Subject line
       template: 'forgot-password.hbs', // HTML body content
       context: {
         name: user.fullName,
         activationCode: OTPCode,
       },
+      attachments: [
+        {
+          filename: 'logo.png',
+          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+          cid: 'logo', // Content ID để reference trong template
+        },
+      ],
     });
 
     await this.usersRepository.save(user);

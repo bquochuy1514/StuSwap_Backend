@@ -25,6 +25,11 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // @Get('test-quota/:id')
+  // testQuota(@Param('id') id: number) {
+  //   return this.usersService.checkAndConsumePostQuota(id);
+  // }
+
   @Get('/profile')
   @UseGuards(JwtAuthGuard)
   async getUserProfile(@Req() req) {
@@ -57,6 +62,12 @@ export class UsersController {
       req.user,
       changePasswordDto,
     );
+  }
+
+  @Get('/me/membership-info')
+  @UseGuards(JwtAuthGuard)
+  async getMembershipInfo(@Req() req) {
+    return await this.usersService.handleGetMembershipInfo(req.user.id);
   }
 
   @Get('')

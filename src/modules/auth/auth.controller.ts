@@ -42,7 +42,10 @@ export class AuthController {
 
   @UseGuards(RefreshAuthGuard)
   @Post('refresh-token')
-  async refreshToken(@Req() req, @Res({ passthrough: true }) res) {
+  async refreshToken(
+    @Req() req,
+    // , @Res({ passthrough: true }) res
+  ) {
     const result = await this.authService.handleRefreshToken(req.user);
     return result;
   }

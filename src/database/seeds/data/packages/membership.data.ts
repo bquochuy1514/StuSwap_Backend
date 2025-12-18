@@ -13,7 +13,6 @@ export const membershipPackages = [
     extend_days: null,
     membership_days: 30,
     max_posts: 20,
-    premium_badge: false,
   },
   {
     key: 'membership_premium_30d',
@@ -29,7 +28,6 @@ export const membershipPackages = [
     extend_days: null,
     membership_days: 30,
     max_posts: 50,
-    premium_badge: true,
   },
   {
     key: 'membership_premium_90d',
@@ -45,7 +43,6 @@ export const membershipPackages = [
     extend_days: null,
     membership_days: 90,
     max_posts: 150,
-    premium_badge: true,
   },
   {
     key: 'membership_vip_30d',
@@ -61,6 +58,5 @@ export const membershipPackages = [
     extend_days: null,
     membership_days: 30,
     max_posts: null, // Unlimited
-    premium_badge: true,
   },
 ];

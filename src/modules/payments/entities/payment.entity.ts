@@ -25,7 +25,7 @@ export class Payment {
   provider: string; // PAYOS - sau này có thể MOMO, ZALO,...
 
   @Column({ unique: true })
-  provider_order_id: number; // orderId của PayOS
+  provider_order_id: number; // random khi tạo để tham chiếu tới mã đơn hàng của PayOS
 
   @Column({ nullable: true })
   transaction_id: string;

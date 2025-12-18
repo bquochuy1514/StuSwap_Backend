@@ -3,9 +3,6 @@ import { runSeeders, SeederOptions } from 'typeorm-extension';
 import { ConfigService } from '@nestjs/config';
 import { config } from 'dotenv';
 import { PackageSeeder } from './seeders';
-import { Package } from 'src/modules/packages/entities/package.entity';
-import { Order } from 'src/modules/orders/entities/order.entity';
-import { User } from 'src/modules/users/entities/user.entity';
 
 config();
 

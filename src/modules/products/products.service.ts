@@ -54,11 +54,26 @@ export class ProductsService {
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
   ) {
-    // 1 Lấy user TypeORM entity
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Sản phẩm phải có ít nhất 1 ảnh');
+    }
+
+    // 1. Lấy user TypeORM entity
     const userDB = await this.usersService.handleGetUserProfile(user);
     if (!userDB) throw new UnauthorizedException('Người dùng không tồn tại');
 
-    // 2 Kiểm tra category
+    // ============================================
+    // 2. CHECK QUOTA TRƯỚC KHI ĐĂNG BÀI
+    // ============================================
+    const quotaCheck = await this.usersService.checkAndConsumePostQuota(
+      userDB.id,
+    );
+
+    if (!quotaCheck.canPost) {
+      throw new ForbiddenException(quotaCheck.reason);
+    }
+
+    // 3. Kiểm tra category
     let category = null;
     if (createProductDto.category_id) {
       category = await this.categoriesService.handleGetCategoryById(
@@ -69,11 +84,9 @@ export class ProductsService {
       }
     }
 
-    // 3 Xử lý hình ảnh
+    // 4. Xử lý hình ảnh
     const imageUrls: string[] =
-      files?.map(
-        (file) => `${process.env.APP_URL}/images/products/${file.filename}`,
-      ) || [];
+      files?.map((file) => `/images/products/${file.filename}`) || [];
 
     const DISPLAY_DAYS = 60;
     const now = new Date();
@@ -81,7 +94,7 @@ export class ProductsService {
       now.getTime() + DISPLAY_DAYS * 24 * 60 * 60 * 1000,
     );
 
-    // 4 Tạo product trước
+    // 5 Tạo product trước
     const product = this.productsRepository.create({
       title: createProductDto.title,
       description: createProductDto.description,
@@ -95,10 +108,10 @@ export class ProductsService {
       promotion_expire_at: null,
     });
 
-    // Lưu product trước để có ID
+    // 6. Lưu product trước để có ID
     const savedProduct = await this.productsRepository.save(product);
 
-    // 5 Nếu có địa chỉ -> tạo ProductAddress riêng, gắn product sau khi có id
+    // 7. Tạo ProductAddress riêng, gắn product sau khi có id
     if (createProductDto.address) {
       const { specificAddress, ward, district, province } =
         createProductDto.address;
@@ -114,18 +127,25 @@ export class ProductsService {
       await this.productAddressRepository.save(address);
     }
 
-    // 6 Lấy lại sản phẩm có quan hệ đầy đủ
+    // 8. Lấy lại sản phẩm có quan hệ đầy đủ
     const fullProduct = await this.productsRepository.findOne({
       where: { id: savedProduct.id },
       relations: ['user', 'category', 'address'],
     });
 
-    // 7 Trả response
+    // 9. Trả response kèm thông tin quota
     return {
       message: 'Đăng tin thành công!',
       product: {
         ...fullProduct,
         user: new SerializedUser(userDB),
+      },
+      quotaInfo: {
+        type: quotaCheck.quotaType,
+        remaining:
+          quotaCheck.remainingQuota === -1
+            ? 'Không giới hạn'
+            : `${quotaCheck.remainingQuota} bài`,
       },
     };
   }
@@ -134,7 +154,7 @@ export class ProductsService {
     const products = await this.productsRepository.find({
       where: { status: ProductStatus.APPROVED },
       relations: ['user', 'category', 'address'],
-      order: { created_at: 'DESC' },
+      order: { priority_level: 'DESC', created_at: 'DESC' },
     });
 
     // map user sang SerializedUser
@@ -148,6 +168,7 @@ export class ProductsService {
     const products = await this.productsRepository.find({
       where: { user: { id: user.id } },
       order: {
+        priority_level: 'DESC',
         // Sắp xếp: chưa hết hạn lên trước, sau đó theo ngày tạo
         is_expired: 'ASC',
         created_at: 'DESC',
@@ -351,13 +372,6 @@ export class ProductsService {
 
     product.expire_at = newExpiry.toDate();
     await this.productsRepository.save(product);
-
-    return {
-      success: true,
-      message: `Gia hạn thành công ${extendedDays} ngày cho sản phẩm #${productId}`,
-      oldExpiry: currentExpiry.format('YYYY-MM-DD HH:mm:ss'),
-      newExpiry: newExpiry.format('YYYY-MM-DD HH:mm:ss'),
-    };
   }
 
   @Cron(CronExpression.EVERY_6_HOURS)
@@ -366,6 +380,7 @@ export class ProductsService {
 
     // Lấy các tin đã hết hạn promotion
     const expiredProducts = await this.productsRepository.find({
+      withDeleted: true,
       where: {
         promotion_expire_at: LessThan(now),
         promotion_type: Not(PromotionType.NONE),
@@ -395,10 +410,10 @@ export class ProductsService {
     const now = new Date();
 
     const expiredProducts = await this.productsRepository.find({
+      withDeleted: true,
       where: {
         expire_at: LessThan(now),
         is_expired: false, // Chưa được đánh dấu
-        deleted_at: IsNull(), // Chưa bị ẩn thủ công
       },
     });
 

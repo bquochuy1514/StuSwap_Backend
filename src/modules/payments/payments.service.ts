@@ -7,9 +7,8 @@ import { PayosService } from './payos/payos.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Package } from '../packages/entities/package.entity';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Product } from '../products/entities/product.entity';
-import { Order } from '../orders/entities/order.entity';
 import { Payment } from './entities/payment.entity';
 import { UsersService } from '../users/users.service';
 import { PromotionType } from '../products/enums/product.enum';
@@ -28,8 +27,6 @@ export class PaymentsService {
     @InjectRepository(Payment)
     private readonly paymentsRepo: Repository<Payment>,
 
-    private readonly dataSource: DataSource,
-
     private readonly userService: UsersService,
   ) {}
 
@@ -38,6 +35,7 @@ export class PaymentsService {
     user: any,
   ) {
     const userDB = await this.userService.findUserByEmail(user.email);
+
     if (!userDB) {
       throw new NotFoundException('Người dùng không tồn tại trong hệ thống');
     }
@@ -80,19 +78,19 @@ export class PaymentsService {
           productId,
         });
 
-      // case 'RENEW':
-      //   if (!productId) {
-      //     throw new BadRequestException(
-      //       'Gói gia hạn yêu cầu phải có productId (tin đăng cần được gia hạn)',
-      //     );
-      //   }
+      case 'RENEW':
+        if (!productId) {
+          throw new BadRequestException(
+            'Gói gia hạn yêu cầu phải có productId (tin đăng cần được gia hạn)',
+          );
+        }
 
-      //   // Chuyển sang service handle renew
-      //   return this.payosService.createRenewPayment({
-      //     pkg,
-      //     user: userDB,
-      //     productId,
-      //   });
+        // Chuyển sang service handle renew
+        return this.payosService.createRenewPayment({
+          pkg,
+          user: userDB,
+          productId,
+        });
 
       // case 'MEMBERSHIP':
       //   // Chuyển sang service handle membership

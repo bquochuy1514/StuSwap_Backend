@@ -3,8 +3,8 @@ import { Seeder } from 'typeorm-extension';
 import { Package } from '../../../modules/packages/entities/package.entity';
 import {
   promotionPackages,
-  // renewPackages,
-  // membershipPackages,
+  renewPackages,
+  membershipPackages,
 } from '../data/index';
 
 export default class PackageSeeder implements Seeder {
@@ -22,15 +22,15 @@ export default class PackageSeeder implements Seeder {
     );
 
     // Seed Renew Packages
-    // await this.seedPackageType(repository, renewPackages, 'RENEW', '🔄');
+    await this.seedPackageType(repository, renewPackages, 'RENEW', '🔄');
 
     // Seed Membership Packages
-    // await this.seedPackageType(
-    //   repository,
-    //   membershipPackages,
-    //   'MEMBERSHIP',
-    //   '👑',
-    // );
+    await this.seedPackageType(
+      repository,
+      membershipPackages,
+      'MEMBERSHIP',
+      '👑',
+    );
 
     console.log('\n✅ All packages seeded successfully!');
   }

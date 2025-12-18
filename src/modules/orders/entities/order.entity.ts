@@ -32,6 +32,13 @@ export class Order {
   @JoinColumn({ name: 'package_id' })
   package: Package;
 
+  @Column({
+    type: 'enum',
+    enum: ['PROMOTION', 'RENEW', 'MEMBERSHIP'],
+    default: 'PROMOTION',
+  })
+  type: 'PROMOTION' | 'RENEW' | 'MEMBERSHIP';
+
   @ManyToOne(() => Product, (product) => product.orders, {
     onDelete: 'SET NULL',
     nullable: true,

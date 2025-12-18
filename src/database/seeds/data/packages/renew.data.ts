@@ -13,7 +13,6 @@ export const renewPackages = [
     extend_days: 7,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
   {
     key: 'renew_15d',
@@ -29,7 +28,6 @@ export const renewPackages = [
     extend_days: 15,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
   {
     key: 'renew_30d',
@@ -45,6 +43,5 @@ export const renewPackages = [
     extend_days: 30,
     membership_days: null,
     max_posts: null,
-    premium_badge: false,
   },
 ];

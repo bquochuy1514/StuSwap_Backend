@@ -21,4 +21,8 @@ export class PackagesService {
 
     return await query.getMany();
   }
+
+  async findOnePackage(packageId: number) {
+    return await this.packagesRepository.findOne({ where: { id: packageId } });
+  }
 }

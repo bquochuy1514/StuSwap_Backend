@@ -55,5 +55,5 @@ export class CreateProductDto {
     province: string;
   };
 
-  image_urls?: string;
+  images?: string;
 }

@@ -71,16 +71,44 @@ export class User {
   @Column({ nullable: true })
   hashedRefreshToken: string;
 
+  // ============================================
+  // FREE TIER - Reset theo chu kỳ 30 ngày
+  // ============================================
+  @Column({ name: 'free_post_quota', type: 'int', default: 5 })
+  freePostQuota: number; // Tổng số bài FREE được đăng (mặc định 5)
+
+  @Column({ name: 'free_post_used', type: 'int', default: 0 })
+  freePostUsed: number; // Số bài FREE đã dùng
+
+  @Column({ name: 'free_quota_reset_at', type: 'timestamp', nullable: true })
+  freeQuotaResetAt: Date; // Thời điểm reset FREE quota (30 ngày kể từ lần đầu dùng)
+
+  // ============================================
+  // MEMBERSHIP TIER - Có thời hạn rõ ràng`
+  // ============================================
+  @Column({ name: 'membership_type', type: 'varchar', nullable: true })
+  membershipType: string | null; // 'BASIC', 'PREMIUM', 'VIP' hoặc null
+
+  @Column({ name: 'membership_expires_at', type: 'timestamp', nullable: true })
+  membershipExpiresAt: Date | null; // Ngày hết hạn membership
+
+  @Column({ name: 'membership_post_quota', type: 'int', nullable: true })
+  membershipPostQuota: number | null; // 20, 50, 150, hoặc null (unlimited cho VIP)
+
+  @Column({ name: 'membership_post_used', type: 'int', default: 0 })
+  membershipPostUsed: number; // Số bài đã dùng trong membership
+
+  // --- Timestamps ---
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
 
+  // --- Relationship ---
   @OneToMany(() => Product, (product) => product.user)
   products: Product[];
 
-  // Danh sách các giao dịch thanh toán của user này
   @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
 }

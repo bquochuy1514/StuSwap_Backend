@@ -16,8 +16,10 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadProductImages } from './interceptors/upload-product-images.interceptor';
+import { TransformImageUrlInterceptor } from 'src/common/interceptors/transform-image-url.interceptor';
 
 @Controller('products')
+@UseInterceptors(TransformImageUrlInterceptor)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
