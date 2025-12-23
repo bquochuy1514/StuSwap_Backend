@@ -9,6 +9,8 @@ import {
   OneToOne,
   OneToMany,
   DeleteDateColumn,
+  BeforeInsert,
+  BeforeUpdate,
 } from 'typeorm';
 import { User } from 'src/modules/users/entities/user.entity';
 import {
@@ -18,8 +20,8 @@ import {
 } from '../enums/product.enum';
 import { Category } from 'src/modules/categories/entities/category.entity';
 import { ProductAddress } from 'src/modules/product_addresses/entities/product_address.entity';
-import { Payment } from 'src/modules/payments/entities/payment.entity';
 import { Order } from 'src/modules/orders/entities/order.entity';
+import { removeVietnameseTones } from 'src/common/utils/string.utils';
 
 @Entity('products')
 export class Product {
@@ -35,6 +37,9 @@ export class Product {
 
   @Column({ type: 'varchar', length: 255 })
   title: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  title_normalized: string; // "dien thoai samsung note 20" (auto-generated)
 
   @Column({ type: 'text', nullable: true })
   description: string;
@@ -110,4 +115,12 @@ export class Product {
   // deleted_at CHỈ dùng cho "ẩn tin" (user action)
   @DeleteDateColumn({ type: 'timestamp', nullable: true })
   deleted_at: Date | null;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  normalizeTitleBeforeSave() {
+    if (this.title) {
+      this.title_normalized = removeVietnameseTones(this.title);
+    }
+  }
 }

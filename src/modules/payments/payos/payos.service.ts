@@ -41,6 +41,16 @@ export class PayosService {
     });
   }
 
+  // Helper function: Xác định level của membership
+  private getMembershipLevel(type: string): number {
+    const levels = {
+      BASIC: 1,
+      PREMIUM: 2,
+      VIP: 3,
+    };
+    return levels[type] || 0;
+  }
+
   private sortObjDataByKey(object: Record<string, any>) {
     return Object.keys(object)
       .sort()
@@ -243,6 +253,90 @@ export class PayosService {
     };
   }
 
+  async createMembershipPayment({ pkg, user }: { pkg: Package; user: User }) {
+    // 1) Kiểm tra user đã có membership còn hạn chưa
+    const now = new Date();
+    const hasMembership =
+      user.membershipType &&
+      user.membershipExpiresAt &&
+      user.membershipExpiresAt > now;
+
+    // Nếu đang có membership và muốn upgrade lên gói cao hơn
+    if (hasMembership) {
+      // Kiểm tra xem có phải upgrade không
+      const currentLevel = this.getMembershipLevel(user.membershipType);
+      const newLevel = this.getMembershipLevel(pkg.membership_type);
+
+      // Cho phép:
+      // - Nâng cấp lên gói cao hơn (VD: BASIC → PREMIUM)
+      // - Gia hạn cùng gói (VD: PREMIUM → PREMIUM)
+      // Không cho phép:
+      // - Hạ cấp (VD: VIP → BASIC)
+      if (newLevel < currentLevel) {
+        throw new BadRequestException(
+          'Không thể hạ cấp xuống gói thấp hơn khi membership còn hạn',
+        );
+      }
+    }
+
+    // 2) Tạo ORDER trước (status = PENDING)
+    const order = this.ordersRepo.create({
+      user,
+      package: pkg,
+      product: null, // Membership không liên quan đến product cụ thể
+      amount: pkg.price,
+      status: 'PENDING',
+      type: 'MEMBERSHIP',
+    });
+
+    const savedOrder = await this.ordersRepo.save(order);
+
+    // 3) Tạo PAYMENT record (PENDING)
+    const orderCode = Math.floor(Date.now() / 1000);
+    const payment = this.paymentRepo.create({
+      order: savedOrder,
+      provider: 'PAYOS',
+      provider_order_id: orderCode,
+      transaction_id: null,
+      amount: pkg.price,
+      status: 'PENDING',
+      raw_data: null,
+    });
+
+    const savedPayment = await this.paymentRepo.save(payment);
+
+    // 4) Gọi PayOS để tạo payment link
+    let payosResponse;
+    try {
+      payosResponse = await this.payOS.paymentRequests.create({
+        amount: Number(pkg.price),
+        description: `${pkg.display_name}`,
+        orderCode,
+        returnUrl: `${this.configService.get('FRONTEND_URL')}/payment/${pkg.package_type}/success?package_id=${pkg.id}`,
+        cancelUrl: `${this.configService.get('FRONTEND_URL')}/payment/${pkg.package_type}/cancel?package_id=${pkg.id}`,
+      });
+    } catch (error) {
+      // Nếu gọi PayOS fail → xoá payment để tránh rác
+      await this.paymentRepo.remove(savedPayment);
+      throw new BadRequestException('Không thể tạo yêu cầu thanh toán PayOS');
+    }
+
+    if (!payosResponse?.checkoutUrl) {
+      throw new BadRequestException('Không thể tạo link thanh toán PayOS');
+    }
+
+    // 5) Update raw_data từ response PayOS
+    savedPayment.raw_data = payosResponse;
+    await this.paymentRepo.save(savedPayment);
+
+    // 6) Trả link về FE
+    return {
+      checkoutUrl: payosResponse.checkoutUrl,
+      orderId: savedOrder.id,
+      paymentId: savedPayment.id,
+    };
+  }
+
   //  Xử lý webhook từ PayOS
   async handleWebhook(body: any) {
     try {
@@ -278,7 +372,7 @@ export class PayosService {
       // 3️⃣ Tìm bản ghi Payment tương ứng
       const payment = await this.paymentRepo.findOne({
         where: { provider_order_id: orderCode },
-        relations: ['order', 'order.product', 'order.package'],
+        relations: ['order', 'order.product', 'order.package', 'order.user'],
       });
 
       if (!payment) {
@@ -333,6 +427,18 @@ export class PayosService {
             this.logger.log(
               `🔄 [RENEW] Gia hạn tin thành công cho sản phẩm #${product.id} (+${duration} ngày)`,
             );
+            break;
+
+          case 'MEMBERSHIP':
+            if (isSuccess && payment.order.user) {
+              await this.usersService.upgradeMembership(
+                payment.order.user.id,
+                payment.order.package,
+              );
+              this.logger.log(
+                `✅ Nâng cấp membership thành công cho user #${payment.order.user.id}`,
+              );
+            }
             break;
 
           default:

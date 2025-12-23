@@ -1,4 +1,5 @@
 import { Order } from 'src/modules/orders/entities/order.entity';
+import { MembershipType } from 'src/modules/users/enums/membership.enum';
 import {
   Column,
   CreateDateColumn,
@@ -60,6 +61,13 @@ export class Package {
 
   @Column({ nullable: true })
   max_posts: number | null;
+
+  @Column({
+    type: 'enum',
+    enum: MembershipType,
+    nullable: true,
+  })
+  membership_type: MembershipType | null; // 'BASIC', 'PREMIUM', 'VIP'
 
   @OneToMany(() => Order, (order) => order.package)
   orders: Order[];

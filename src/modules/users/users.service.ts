@@ -1,10 +1,11 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThanOrEqual, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 import { SerializedUser } from 'src/common/types';
@@ -18,9 +19,14 @@ import {
   hashPassword,
 } from 'src/common/utils/password-hash.util';
 import { Address } from '../addresses/entities/address.entity';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { Package } from '../packages/entities/package.entity';
+import { ProductStatus } from '../products/enums/product.enum';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
@@ -28,6 +34,15 @@ export class UsersService {
     @InjectRepository(Address)
     private addressesRepository: Repository<Address>,
   ) {}
+
+  private getMembershipLevel(type: string): number {
+    const levels = {
+      BASIC: 1,
+      PREMIUM: 2,
+      VIP: 3,
+    };
+    return levels[type] || 0;
+  }
 
   private formatAvatarUrl(avatarPath: string): string {
     const baseUrl = this.configService.get<string>('APP_URL');
@@ -342,11 +357,8 @@ export class UsersService {
         type: 'MEMBERSHIP',
         membershipType: user.membershipType,
         currentUsed: user.membershipPostUsed,
-        totalQuota: user.membershipPostQuota, // null nếu VIP (unlimited)
-        remaining:
-          user.membershipPostQuota === null
-            ? null // unlimited
-            : user.membershipPostQuota - user.membershipPostUsed,
+        totalQuota: user.membershipPostQuota,
+        remaining: user.membershipPostQuota - user.membershipPostUsed,
         resetAt: null,
         expiresAt: user.membershipExpiresAt.toISOString(),
       };
@@ -383,7 +395,10 @@ export class UsersService {
 
     // Bài đang hoạt động (chưa hết hạn)
     const activePosts = products.filter(
-      (product) => product.expire_at && new Date(product.expire_at) > now,
+      (product) =>
+        product.status === ProductStatus.APPROVED &&
+        product.expire_at &&
+        new Date(product.expire_at) > now,
     ).length;
 
     // Bài hết hạn
@@ -402,5 +417,170 @@ export class UsersService {
         expiredPosts,
       },
     };
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async resetExpiredFreeQuotas() {
+    this.logger.log('🔄 Bắt đầu reset FREE quota cho users hết hạn...');
+
+    try {
+      const now = new Date();
+
+      // Tìm tất cả users có freeQuotaResetAt <= now (đã hết chu kỳ)
+      const expiredUsers = await this.usersRepository.find({
+        where: {
+          freeQuotaResetAt: LessThanOrEqual(now),
+        },
+      });
+
+      if (expiredUsers.length === 0) {
+        this.logger.log('✅ Không có user nào cần reset FREE quota');
+        return;
+      }
+
+      this.logger.log(`📝 Tìm thấy ${expiredUsers.length} users cần reset`);
+
+      // Reset quota cho từng user
+      const resetPromises = expiredUsers.map(async (user) => {
+        user.freePostUsed = 0;
+        user.freeQuotaResetAt = new Date(
+          now.getTime() + 30 * 24 * 60 * 60 * 1000, // +30 ngày
+        );
+        return this.usersRepository.save(user);
+      });
+
+      await Promise.all(resetPromises);
+
+      this.logger.log(
+        `✅ Đã reset FREE quota thành công cho ${expiredUsers.length} users`,
+      );
+    } catch (error) {
+      this.logger.error('❌ Lỗi khi reset FREE quota:', error);
+    }
+  }
+
+  /**
+   * Cron job: Xử lý membership hết hạn
+   * Chạy mỗi ngày lúc 00:30
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async handleExpiredMemberships() {
+    this.logger.log('🔄 Bắt đầu xử lý membership hết hạn...');
+
+    try {
+      const now = new Date();
+
+      // Tìm users có membership hết hạn
+      const expiredMembershipUsers = await this.usersRepository.find({
+        where: {
+          membershipExpiresAt: LessThanOrEqual(now),
+        },
+      });
+
+      if (expiredMembershipUsers.length === 0) {
+        this.logger.log('✅ Không có membership nào hết hạn');
+        return;
+      }
+
+      this.logger.log(
+        `📝 Tìm thấy ${expiredMembershipUsers.length} memberships hết hạn`,
+      );
+
+      // Reset về FREE cho từng user
+      const resetPromises = expiredMembershipUsers.map(async (user) => {
+        // Lưu lại thông tin cũ (nếu cần log)
+        const oldType = user.membershipType;
+
+        // Reset membership
+        user.membershipType = null;
+        user.membershipExpiresAt = null;
+        user.membershipPostQuota = 0;
+        user.membershipPostUsed = 0;
+
+        // Khởi tạo FREE quota nếu chưa có
+        if (!user.freeQuotaResetAt || user.freeQuotaResetAt <= now) {
+          user.freePostUsed = 0;
+          user.freeQuotaResetAt = new Date(
+            now.getTime() + 30 * 24 * 60 * 60 * 1000,
+          );
+        }
+
+        this.logger.log(
+          `📌 User ${user.id} (${user.email}): ${oldType} → FREE`,
+        );
+
+        return this.usersRepository.save(user);
+      });
+
+      await Promise.all(resetPromises);
+
+      this.logger.log(
+        `✅ Đã xử lý ${expiredMembershipUsers.length} memberships hết hạn`,
+      );
+    } catch (error) {
+      this.logger.error('❌ Lỗi khi xử lý membership hết hạn:', error);
+    }
+  }
+
+  async upgradeMembership(userId: number, pkg: Package) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    const now = new Date();
+
+    // Tính ngày hết hạn mới
+    let newExpiresAt: Date;
+
+    // Nếu đang có membership còn hạn
+    if (
+      user.membershipExpiresAt &&
+      user.membershipExpiresAt > now &&
+      user.membershipType
+    ) {
+      const currentLevel = this.getMembershipLevel(user.membershipType);
+      const newLevel = this.getMembershipLevel(pkg.membership_type);
+
+      if (newLevel > currentLevel) {
+        // UPGRADE: Nâng cấp lên gói cao hơn
+        // → Giữ thời gian còn lại + thêm thời gian gói mới
+        const remainingTime =
+          user.membershipExpiresAt.getTime() - now.getTime();
+        const packageDuration = pkg.membership_days * 24 * 60 * 60 * 1000;
+        newExpiresAt = new Date(
+          now.getTime() + remainingTime + packageDuration,
+        );
+      } else {
+        // RENEW: Gia hạn cùng gói (newLevel === currentLevel)
+        // → Cộng thêm thời gian từ ngày hết hạn hiện tại
+        newExpiresAt = new Date(
+          user.membershipExpiresAt.getTime() +
+            pkg.membership_days * 24 * 60 * 60 * 1000,
+        );
+      }
+    } else {
+      // Chưa có membership hoặc đã hết hạn → tính từ bây giờ
+      newExpiresAt = new Date(
+        now.getTime() + pkg.membership_days * 24 * 60 * 60 * 1000,
+      );
+    }
+
+    // Cập nhật thông tin membership
+    user.membershipType = pkg.membership_type;
+    user.membershipExpiresAt = newExpiresAt;
+    user.membershipPostQuota = pkg.max_posts;
+    user.membershipPostUsed = 0; // Reset số bài đã dùng khi nâng cấp
+
+    await this.usersRepository.save(user);
+
+    this.logger.log(
+      `✅ User #${userId} đã nâng cấp lên ${pkg.membership_type}, hết hạn: ${newExpiresAt.toISOString()}`,
+    );
+
+    return new SerializedUser(user);
   }
 }

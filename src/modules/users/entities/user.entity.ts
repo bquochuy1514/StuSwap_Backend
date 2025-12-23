@@ -11,6 +11,7 @@ import { UserRole } from '../enums/user.enum';
 import { Product } from 'src/modules/products/entities/product.entity';
 import { Address } from 'src/modules/addresses/entities/address.entity';
 import { Order } from 'src/modules/orders/entities/order.entity';
+import { MembershipType } from '../enums/membership.enum';
 
 @Entity('users')
 export class User {
@@ -86,14 +87,19 @@ export class User {
   // ============================================
   // MEMBERSHIP TIER - Có thời hạn rõ ràng`
   // ============================================
-  @Column({ name: 'membership_type', type: 'varchar', nullable: true })
-  membershipType: string | null; // 'BASIC', 'PREMIUM', 'VIP' hoặc null
+  @Column({
+    name: 'membership_type',
+    type: 'enum',
+    enum: MembershipType,
+    nullable: true,
+  })
+  membershipType: MembershipType | null;
 
   @Column({ name: 'membership_expires_at', type: 'timestamp', nullable: true })
   membershipExpiresAt: Date | null; // Ngày hết hạn membership
 
   @Column({ name: 'membership_post_quota', type: 'int', nullable: true })
-  membershipPostQuota: number | null; // 20, 50, 150, hoặc null (unlimited cho VIP)
+  membershipPostQuota: number | null; // 15, 40, 120, hoặc 200
 
   @Column({ name: 'membership_post_used', type: 'int', default: 0 })
   membershipPostUsed: number; // Số bài đã dùng trong membership

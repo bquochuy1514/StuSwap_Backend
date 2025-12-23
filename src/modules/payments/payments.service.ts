@@ -92,12 +92,12 @@ export class PaymentsService {
           productId,
         });
 
-      // case 'MEMBERSHIP':
-      //   // Chuyển sang service handle membership
-      //   return this.payosService.createMembershipPayment({
-      //     pkg,
-      //     user: userDB,
-      //   });
+      case 'MEMBERSHIP':
+        // Chuyển sang service handle membership
+        return this.payosService.createMembershipPayment({
+          pkg,
+          user: userDB,
+        });
 
       default:
         throw new BadRequestException(

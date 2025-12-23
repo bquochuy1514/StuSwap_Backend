@@ -22,6 +22,8 @@ import { ProductAddress } from '../product_addresses/entities/product_address.en
 import { ProductStatus, PromotionType } from './enums/product.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Package } from '../packages/entities/package.entity';
+import { SearchProductDto } from './dto/search-product.dto';
+import { removeVietnameseTones } from 'src/common/utils/string.utils';
 
 @Injectable()
 export class ProductsService {
@@ -54,64 +56,79 @@ export class ProductsService {
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
   ) {
+    // ============================================
+    // 1. VALIDATION CƠ BẢN
+    // ============================================
     if (!files || files.length === 0) {
       throw new BadRequestException('Sản phẩm phải có ít nhất 1 ảnh');
     }
 
-    // 1. Lấy user TypeORM entity
+    // ============================================
+    // 2. LẤY USER & CHECK QUOTA
+    // ============================================
     const userDB = await this.usersService.handleGetUserProfile(user);
-    if (!userDB) throw new UnauthorizedException('Người dùng không tồn tại');
+    if (!userDB) {
+      throw new UnauthorizedException('Người dùng không tồn tại');
+    }
 
-    // ============================================
-    // 2. CHECK QUOTA TRƯỚC KHI ĐĂNG BÀI
-    // ============================================
     const quotaCheck = await this.usersService.checkAndConsumePostQuota(
       userDB.id,
     );
-
     if (!quotaCheck.canPost) {
       throw new ForbiddenException(quotaCheck.reason);
     }
 
-    // 3. Kiểm tra category
+    // ============================================
+    // 3. VALIDATE CATEGORY
+    // ============================================
     let category = null;
     if (createProductDto.category_id) {
       category = await this.categoriesService.handleGetCategoryById(
         createProductDto.category_id,
       );
+
       if (!category) {
         throw new BadRequestException('Category không tồn tại');
       }
     }
 
-    // 4. Xử lý hình ảnh
-    const imageUrls: string[] =
-      files?.map((file) => `/images/products/${file.filename}`) || [];
-
-    const DISPLAY_DAYS = 60;
-    const now = new Date();
-    const expireAt = new Date(
-      now.getTime() + DISPLAY_DAYS * 24 * 60 * 60 * 1000,
+    // ============================================
+    // 4. XỬ LÝ HÌNH ẢNH
+    // ============================================
+    const imageUrls: string[] = files.map(
+      (file) => `/images/products/${file.filename}`,
     );
 
-    // 5 Tạo product trước
+    // ============================================
+    // 5. TÍNH EXPIRE DATE
+    // ============================================
+    const DISPLAY_DAYS = 60;
+    const expireAt = new Date();
+    expireAt.setDate(expireAt.getDate() + DISPLAY_DAYS);
+
+    // ============================================
+    // 6. TẠO PRODUCT
+    // ============================================
     const product = this.productsRepository.create({
       title: createProductDto.title,
+      // title_normalized sẽ tự động được tạo bởi @BeforeInsert hook
       description: createProductDto.description,
       price: createProductDto.price,
       condition: createProductDto.condition,
       category,
       user: userDB,
       image_urls: JSON.stringify(imageUrls),
-      expire_at: expireAt, // tin sẽ hết hạn sau 60 ngày
-      promotion_type: PromotionType.NONE, // chưa chọn gói nào
+      expire_at: expireAt,
+      promotion_type: PromotionType.NONE,
       promotion_expire_at: null,
     });
 
-    // 6. Lưu product trước để có ID
+    // Lưu product (hook sẽ tự động chạy)
     const savedProduct = await this.productsRepository.save(product);
 
-    // 7. Tạo ProductAddress riêng, gắn product sau khi có id
+    // ============================================
+    // 7. TẠO ADDRESS (nếu có)
+    // ============================================
     if (createProductDto.address) {
       const { specificAddress, ward, district, province } =
         createProductDto.address;
@@ -121,19 +138,23 @@ export class ProductsService {
         ward,
         district,
         province,
-        product: savedProduct, // giờ product đã có id thật
+        product: savedProduct,
       });
 
       await this.productAddressRepository.save(address);
     }
 
-    // 8. Lấy lại sản phẩm có quan hệ đầy đủ
+    // ============================================
+    // 8. LẤY LẠI PRODUCT ĐẦY ĐỦ
+    // ============================================
     const fullProduct = await this.productsRepository.findOne({
       where: { id: savedProduct.id },
       relations: ['user', 'category', 'address'],
     });
 
-    // 9. Trả response kèm thông tin quota
+    // ============================================
+    // 9. RETURN RESPONSE
+    // ============================================
     return {
       message: 'Đăng tin thành công!',
       product: {
@@ -146,6 +167,151 @@ export class ProductsService {
           quotaCheck.remainingQuota === -1
             ? 'Không giới hạn'
             : `${quotaCheck.remainingQuota} bài`,
+      },
+    };
+  }
+
+  async handleUpdateProduct(
+    id: number,
+    user: any,
+    updateProductDto: UpdateProductDto,
+    files: Express.Multer.File[],
+  ) {
+    // ============================================
+    // 1. LẤY USER & PRODUCT
+    // ============================================
+    const userDB = await this.usersService.findUserByEmail(user.email);
+
+    const productDB = await this.productsRepository.findOne({
+      where: { id },
+      relations: ['user', 'category', 'address'], // ✅ Thêm address luôn
+    });
+
+    if (!productDB) {
+      throw new NotFoundException('Không tìm thấy sản phẩm');
+    }
+
+    // ============================================
+    // 2. CHECK PERMISSION
+    // ============================================
+    if (userDB.id !== productDB.user.id && userDB.role !== 'admin') {
+      throw new ForbiddenException('Bạn không có quyền sửa sản phẩm này');
+    }
+
+    // ============================================
+    // 3. XỬ LÝ HÌNH ẢNH
+    // ============================================
+    // Parse mảng ảnh hiện tại
+    const oldImages: string[] = productDB.image_urls
+      ? JSON.parse(productDB.image_urls)
+      : [];
+
+    // Parse danh sách ảnh muốn giữ lại
+    let keepImages: string[] = [];
+    if (updateProductDto['keepImages']) {
+      try {
+        keepImages = JSON.parse(updateProductDto['keepImages']);
+      } catch (error) {
+        throw new BadRequestException('keepImages phải là JSON array hợp lệ');
+      }
+    }
+
+    // Tìm ảnh cần xóa
+    const deleteImages = oldImages.filter((img) => !keepImages.includes(img));
+
+    // Xóa ảnh khỏi file system
+    await Promise.all(
+      deleteImages.map(async (url) => {
+        const filePath = path.join(
+          __dirname,
+          '../../../public/images/products',
+          path.basename(url),
+        );
+
+        try {
+          if (fs.existsSync(filePath)) {
+            await fs.promises.unlink(filePath); // ✅ Dùng async để tránh block
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to delete image: ${filePath}`, error);
+        }
+      }),
+    );
+
+    // Thêm ảnh mới
+    const newImages =
+      files?.map((file) => `/images/products/${file.filename}`) || [];
+
+    // Tổng hợp ảnh cuối cùng
+    const finalImages = [...keepImages, ...newImages];
+
+    // ============================================
+    // 4. VALIDATE CATEGORY (nếu có update)
+    // ============================================
+    if (updateProductDto.category_id) {
+      const category = await this.categoriesService.handleGetCategoryById(
+        updateProductDto.category_id,
+      );
+
+      if (!category) {
+        throw new BadRequestException('Category không tồn tại');
+      }
+    }
+
+    // ============================================
+    // 5. UPDATE PRODUCT
+    // ============================================
+    // 🔥 Cập nhật trực tiếp entity rồi save để trigger hook
+    Object.assign(productDB, {
+      ...updateProductDto,
+      image_urls: JSON.stringify(finalImages),
+    });
+
+    // 🔥 Hook @BeforeUpdate sẽ tự động chạy khi save
+    const updatedProduct = await this.productsRepository.save(productDB);
+
+    // ============================================
+    // 6. UPDATE ADDRESS (nếu có)
+    // ============================================
+    if (updateProductDto.address) {
+      const { specificAddress, ward, district, province } =
+        updateProductDto.address;
+
+      if (productDB.address) {
+        // Update address hiện tại
+        await this.productAddressRepository.update(
+          { id: productDB.address.id },
+          { specificAddress, ward, district, province },
+        );
+      } else {
+        // Tạo mới nếu chưa có
+        const newAddress = this.productAddressRepository.create({
+          specificAddress,
+          ward,
+          district,
+          province,
+          product: updatedProduct,
+        });
+        await this.productAddressRepository.save(newAddress);
+      }
+    }
+
+    // ============================================
+    // 7. LẤY LẠI PRODUCT ĐẦY ĐỦ
+    // ============================================
+    const fullProduct = await this.productsRepository.findOne({
+      where: { id },
+      relations: ['user', 'category', 'address'],
+    });
+
+    // ============================================
+    // 8. RETURN RESPONSE
+    // ============================================
+    return {
+      message: 'Cập nhật sản phẩm thành công',
+      product: {
+        ...fullProduct,
+        user: new SerializedUser(fullProduct.user),
       },
     };
   }
@@ -203,86 +369,11 @@ export class ProductsService {
       throw new NotFoundException('Không tìm thấy sản phẩm');
     }
 
-    return {
-      ...productDB,
-      user: new SerializedUser(productDB.user),
-    };
-  }
-
-  async handleUpdateProduct(
-    id: number,
-    user: any,
-    updateProductDto: UpdateProductDto,
-    files: Express.Multer.File[],
-  ) {
-    const userDB = await this.usersService.findUserByEmail(user.email);
-    const productDB = await this.productsRepository.findOne({
-      where: { id },
-      relations: ['user', 'category'],
-    });
-
-    if (!productDB) {
-      throw new NotFoundException('Không tìm thấy sản phẩm');
-    }
-
-    if (userDB.id !== productDB.user.id && userDB.role !== 'admin') {
-      throw new ForbiddenException('Bạn không có quyền sửa sản phẩm này');
-    }
-
-    // Parse mảng ảnh hiện tại
-    // eslint-disable-next-line prefer-const
-    let oldImages: string[] = productDB.image_urls
-      ? JSON.parse(productDB.image_urls)
-      : [];
-
-    // Parse danh sách ảnh muốn giữ lại
-    let keepImages: string[] = [];
-    if (updateProductDto['keepImages']) {
-      keepImages = JSON.parse(updateProductDto['keepImages']);
-    }
-
-    // Tìm ảnh nào cần xóa (có trong oldImages nhưng không nằm trong keepImages)
-    const deleteImages = oldImages.filter((img) => !keepImages.includes(img));
-
-    // Xóa ảnh bị loại khỏi file system
-    await Promise.all(
-      deleteImages.map((url) => {
-        const filePath = path.join(
-          __dirname,
-          '../../../public/images/products',
-          path.basename(url),
-        );
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      }),
-    );
-
-    // Thêm ảnh mới (nếu có)
-    const newImages =
-      files?.map(
-        (file) => `${process.env.APP_URL}/images/products/${file.filename}`,
-      ) || [];
-
-    // Tổng hợp danh sách ảnh cuối cùng
-    const finalImages = [...keepImages, ...newImages];
-
-    // Update dữ liệu
-    await this.productsRepository.update(
-      { id },
-      { ...updateProductDto, image_urls: JSON.stringify(finalImages) },
-    );
-
-    // Lấy lại sản phẩm sau khi update
-    const updatedProduct = await this.productsRepository.findOne({
-      where: { id },
-      relations: ['user', 'category'],
-    });
+    const { user, ...productWithoutUser } = productDB;
 
     return {
-      message: 'Cập nhật sản phẩm thành công',
-      product: {
-        ...updatedProduct,
-        user: new SerializedUser(updatedProduct.user),
-      },
+      ...productWithoutUser,
+      user: new SerializedUser(user),
     };
   }
 
@@ -431,5 +522,138 @@ export class ProductsService {
     this.logger.log(
       `⏰ Đã đánh dấu ${expiredProducts.length} sản phẩm hết hạn hiển thị.`,
     );
+  }
+
+  /**
+   * Tìm kiếm sản phẩm với filter và pagination
+   * Hỗ trợ tìm kiếm tiếng Việt có dấu với utf8mb4_unicode_ci collation
+   */
+  async handleSearchProducts(searchDto: SearchProductDto) {
+    const {
+      q,
+      categoryId,
+      minPrice,
+      maxPrice,
+      condition,
+      province,
+      sortBy = 'newest',
+      page = 1,
+      limit = 15,
+    } = searchDto;
+
+    const query = this.productsRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.user', 'user')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.address', 'address');
+
+    // Base conditions
+    query
+      .where('product.status = :status', { status: ProductStatus.APPROVED })
+      .andWhere('product.is_sold = :isSold', { isSold: false })
+      .andWhere('product.is_expired = :isExpired', { isExpired: false })
+      .andWhere('product.deleted_at IS NULL');
+
+    // ============================================
+    // TÌM KIẾM THEO TITLE_NORMALIZED
+    // ============================================
+    if (q && q.trim()) {
+      const normalizedQuery = removeVietnameseTones(q);
+      const keywords = normalizedQuery
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 0);
+
+      if (keywords.length > 0) {
+        const searchConditions = keywords
+          .map((_, index) => `product.title_normalized LIKE :keyword${index}`)
+          .join(' AND ');
+
+        const params: Record<string, string> = {};
+        keywords.forEach((word, index) => {
+          params[`keyword${index}`] = `%${word}%`;
+        });
+
+        query.andWhere(`(${searchConditions})`, params);
+      }
+    }
+
+    // Category filter
+    if (categoryId) {
+      query.andWhere('product.category.id = :categoryId', { categoryId });
+    }
+
+    // Price filter
+    if (minPrice !== undefined && minPrice >= 0) {
+      query.andWhere('product.price >= :minPrice', { minPrice });
+    }
+    if (maxPrice !== undefined && maxPrice >= 0) {
+      query.andWhere('product.price <= :maxPrice', { maxPrice });
+    }
+
+    // Condition filter
+    if (condition && condition.length > 0) {
+      query.andWhere('product.condition IN (:...conditions)', {
+        conditions: condition,
+      });
+    }
+
+    // Province filter
+    if (province && province.trim()) {
+      query.andWhere(
+        'address.province COLLATE utf8mb4_unicode_ci LIKE :province',
+        {
+          province: `%${province.trim()}%`,
+        },
+      );
+    }
+
+    // Sorting
+    switch (sortBy) {
+      case 'newest':
+        query
+          .orderBy('product.priority_level', 'DESC')
+          .addOrderBy('product.created_at', 'DESC');
+        break;
+      case 'price_asc':
+        query
+          .orderBy('product.priority_level', 'DESC')
+          .addOrderBy('product.price', 'ASC');
+        break;
+      case 'price_desc':
+        query
+          .orderBy('product.priority_level', 'DESC')
+          .addOrderBy('product.price', 'DESC');
+        break;
+      default:
+        query.orderBy('product.created_at', 'DESC');
+    }
+
+    // Pagination
+    query.skip((page - 1) * limit).take(limit);
+
+    // Execute
+    const [products, total] = await query.getManyAndCount();
+
+    // Format response
+    const data = products.map((product) => ({
+      ...product,
+      user: new SerializedUser(product.user),
+    }));
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
   }
 }

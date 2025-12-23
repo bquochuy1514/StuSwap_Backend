@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   Put,
+  Query,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -17,6 +18,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadProductImages } from './interceptors/upload-product-images.interceptor';
 import { TransformImageUrlInterceptor } from 'src/common/interceptors/transform-image-url.interceptor';
+import { SerializedUser } from 'src/common/types';
+import { SearchProductDto } from './dto/search-product.dto';
 
 @Controller('products')
 @UseInterceptors(TransformImageUrlInterceptor)
@@ -41,6 +44,14 @@ export class ProductsController {
   @Get()
   findAll() {
     return this.productsService.handleFindAllProducts();
+  }
+
+  // ============================================
+  // SEARCH ENDPOINT - ĐẶT TRƯỚC :id
+  // ============================================
+  @Get('search')
+  searchProducts(@Query() searchDto: SearchProductDto) {
+    return this.productsService.handleSearchProducts(searchDto);
   }
 
   @Get('my')
