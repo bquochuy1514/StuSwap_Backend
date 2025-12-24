@@ -12,13 +12,20 @@ import { Repository } from 'typeorm';
 import { slugify } from 'src/common/utils/slugify';
 import { join } from 'path';
 import { unlink } from 'fs/promises';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private categoriesRepository: Repository<Category>,
+    private readonly configService: ConfigService,
   ) {}
+
+  private formatCategoryUrl(categoryPath: string): string {
+    const baseUrl = this.configService.get<string>('APP_URL');
+    return `${baseUrl}${categoryPath}`;
+  }
 
   async handleCreateCategory(
     createCategoryDto: CreateCategoryDto,
@@ -50,11 +57,18 @@ export class CategoriesService {
   }
 
   async handleFindAllCategories() {
-    return await this.categoriesRepository.find();
+    const categories = await this.categoriesRepository.find();
+    const formattedCategories = categories.map((category) => {
+      category.icon_url = this.formatCategoryUrl(category.icon_url);
+      return category;
+    });
+    return formattedCategories;
   }
 
   async handleGetCategoryById(id: number) {
-    return await this.categoriesRepository.findOne({ where: { id } });
+    const category = await this.categoriesRepository.findOne({ where: { id } });
+    category.icon_url = this.formatCategoryUrl(category.icon_url);
+    return category;
   }
 
   async handleUpdateCategoryById(
