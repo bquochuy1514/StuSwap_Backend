@@ -14,7 +14,7 @@ async function bootstrap() {
       process.env.FRONTEND_URL,
       'http://localhost:3000',
       'bf33e49873f9.ngrok-free.app',
-      'https://studentswap-ten.vercel.app/',
+      'https://studentswap-ten.vercel.app',
     ],
   });
 
