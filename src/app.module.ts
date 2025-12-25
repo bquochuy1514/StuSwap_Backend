@@ -46,12 +46,14 @@ import { OrdersModule } from './modules/orders/orders.module';
         transport: {
           host: configService.get<string>('MAIL_HOST'),
           port: configService.get<number>('MAIL_PORT'),
-          secure: true,
-          // ignoreTLS: true,
-          // secure: false,
+          ignoreTLS: true,
+          secure: false,
           auth: {
             user: configService.get<string>('MAIL_USER'),
             pass: configService.get<string>('MAIL_PASSWORD'),
+          },
+          tls: {
+            rejectUnauthorized: false, // ← Thêm dòng này
           },
         },
         defaults: {
