@@ -30,6 +30,7 @@ import refreshJwtConfig from './config/refresh-jwt.config';
 import { ConfigType } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import { join } from 'path';
+import { EmailService } from 'src/common/services/email.service';
 
 @Injectable()
 export class AuthService {
@@ -41,6 +42,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    private readonly emailService: EmailService,
   ) {}
 
   async validateUser(loginDto: LoginDto) {
@@ -120,7 +122,7 @@ export class AuthService {
     });
 
     // Sending email
-    this.mailerService.sendMail({
+    this.emailService.sendMail({
       to: createdUser.email, // list of receivers
       subject: 'Kích hoạt tài khoản StudentSwap', // Subject line
       template: 'register.hbs', // HTML body content
@@ -128,14 +130,24 @@ export class AuthService {
         name: createdUser.fullName,
         activationCode: createdUser.codeId,
       },
-      attachments: [
-        {
-          filename: 'logo.png',
-          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
-          cid: 'logo', // Content ID để reference trong template
-        },
-      ],
     });
+
+    // this.mailerService.sendMail({
+    //   to: createdUser.email, // list of receivers
+    //   subject: 'Kích hoạt tài khoản StudentSwap', // Subject line
+    //   template: 'register.hbs', // HTML body content
+    //   context: {
+    //     name: createdUser.fullName,
+    //     activationCode: createdUser.codeId,
+    //   },
+    //   attachments: [
+    //     {
+    //       filename: 'logo.png',
+    //       path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+    //       cid: 'logo', // Content ID để reference trong template
+    //     },
+    //   ],
+    // });
 
     await this.usersRepository.save(createdUser);
 
@@ -266,7 +278,7 @@ export class AuthService {
     await this.usersRepository.save(user);
 
     // Sending email
-    this.mailerService.sendMail({
+    this.emailService.sendMail({
       to: user.email, // list of receivers
       subject: 'Kích hoạt tài khoản StudentSwap', // Subject line
       template: 'register.hbs', // HTML body content
@@ -274,14 +286,24 @@ export class AuthService {
         name: user.fullName,
         activationCode: user.codeId,
       },
-      attachments: [
-        {
-          filename: 'logo.png',
-          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
-          cid: 'logo', // Content ID để reference trong template
-        },
-      ],
     });
+
+    // this.mailerService.sendMail({
+    //   to: user.email, // list of receivers
+    //   subject: 'Kích hoạt tài khoản StudentSwap', // Subject line
+    //   template: 'register.hbs', // HTML body content
+    //   context: {
+    //     name: user.fullName,
+    //     activationCode: user.codeId,
+    //   },
+    //   attachments: [
+    //     {
+    //       filename: 'logo.png',
+    //       path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+    //       cid: 'logo', // Content ID để reference trong template
+    //     },
+    //   ],
+    // });
 
     return { message: 'Mã xác nhận mới đã được gửi đến email của bạn.' };
   }
@@ -309,7 +331,7 @@ export class AuthService {
     user.isOtpVerified = false;
 
     // Sending email
-    await this.mailerService.sendMail({
+    await this.emailService.sendMail({
       to: user.email, // list of receivers
       subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản StudentSwap', // Subject line
       template: 'forgot-password.hbs', // HTML body content
@@ -317,14 +339,23 @@ export class AuthService {
         name: user.fullName,
         activationCode: OTPCode,
       },
-      attachments: [
-        {
-          filename: 'logo.png',
-          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
-          cid: 'logo', // Content ID để reference trong template
-        },
-      ],
     });
+    // await this.mailerService.sendMail({
+    //   to: user.email, // list of receivers
+    //   subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản StudentSwap', // Subject line
+    //   template: 'forgot-password.hbs', // HTML body content
+    //   context: {
+    //     name: user.fullName,
+    //     activationCode: OTPCode,
+    //   },
+    //   attachments: [
+    //     {
+    //       filename: 'logo.png',
+    //       path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+    //       cid: 'logo', // Content ID để reference trong template
+    //     },
+    //   ],
+    // });
 
     await this.usersRepository.save(user);
 
@@ -350,7 +381,7 @@ export class AuthService {
     user.isOtpVerified = false;
 
     // Sending email
-    await this.mailerService.sendMail({
+    await this.emailService.sendMail({
       to: user.email, // list of receivers
       subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản StudentSwap', // Subject line
       template: 'forgot-password.hbs', // HTML body content
@@ -358,14 +389,23 @@ export class AuthService {
         name: user.fullName,
         activationCode: OTPCode,
       },
-      attachments: [
-        {
-          filename: 'logo.png',
-          path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
-          cid: 'logo', // Content ID để reference trong template
-        },
-      ],
     });
+    // await this.mailerService.sendMail({
+    //   to: user.email, // list of receivers
+    //   subject: 'Mã OTP để thiết lập mật khẩu mới cho tài khoản StudentSwap', // Subject line
+    //   template: 'forgot-password.hbs', // HTML body content
+    //   context: {
+    //     name: user.fullName,
+    //     activationCode: OTPCode,
+    //   },
+    //   attachments: [
+    //     {
+    //       filename: 'logo.png',
+    //       path: join(process.cwd(), 'public/images/logo/student_swap_logo.png'),
+    //       cid: 'logo', // Content ID để reference trong template
+    //     },
+    //   ],
+    // });
 
     await this.usersRepository.save(user);
 

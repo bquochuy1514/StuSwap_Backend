@@ -13,6 +13,7 @@ import googleOauthConfig from './config/google-oauth.config';
 import { GoogleStrategy } from './strategies/google.strategy';
 import refreshJwtConfig from './config/refresh-jwt.config';
 import { RefreshJwtStrategy } from './strategies/refresh.strategy';
+import { EmailService } from 'src/common/services/email.service';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { RefreshJwtStrategy } from './strategies/refresh.strategy';
     JwtStrategy,
     GoogleStrategy,
     RefreshJwtStrategy,
+    EmailService,
   ],
 })
 export class AuthModule {}
