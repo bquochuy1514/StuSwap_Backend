@@ -5,7 +5,6 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Observable } from 'rxjs';
 import { UserRole } from 'src/modules/users/enums/user.enum';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 

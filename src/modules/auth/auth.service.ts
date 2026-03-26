@@ -29,7 +29,6 @@ import { GoogleLoginDto } from './dto/google-login.dto';
 import refreshJwtConfig from './config/refresh-jwt.config';
 import { ConfigType } from '@nestjs/config';
 import * as argon2 from 'argon2';
-import { join } from 'path';
 import { EmailService } from 'src/common/services/email.service';
 
 @Injectable()
@@ -39,7 +38,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @Inject(refreshJwtConfig.KEY)
     private refreshTokenConfig: ConfigType<typeof refreshJwtConfig>,
-    private readonly mailerService: MailerService,
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private readonly emailService: EmailService,
@@ -106,6 +104,7 @@ export class AuthService {
     const existedUser = await this.usersService.findUserByEmail(
       registerDto.email,
     );
+
     if (existedUser) {
       throw new BadRequestException(
         'Email này đã tồn tại trong hệ thống. Vui lòng đăng nhập hoặc chọn email khác.',
